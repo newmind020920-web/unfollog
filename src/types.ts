@@ -18,6 +18,10 @@ export type Snapshot = {
   label: string
   followers: IgUser[]
   following: IgUser[]
+  /** 내가 최근에 언팔한 계정. 내보내기에 그 파일이 없었으면 undefined */
+  unfollowedByMe?: IgUser[]
+  /** 내가 차단한 계정. 내보내기에 그 파일이 없었으면 undefined */
+  blockedByMe?: IgUser[]
   /** 체험용 샘플 데이터인가 — 실제 업로드와 섞이지 않게 구분합니다 */
   sample?: boolean
 }
@@ -35,6 +39,8 @@ export type SnapshotMeta = {
 export type ParseResult = {
   followers: IgUser[]
   following: IgUser[]
+  unfollowedByMe?: IgUser[]
+  blockedByMe?: IgUser[]
   /** 어떤 파일에서 무엇을 읽었는지 — UI에서 사용자에게 보여줄 근거 */
   sources: { file: string; kind: 'followers' | 'following'; count: number }[]
   /** 치명적이지 않은 문제 (예: 파일 하나를 못 읽음) */

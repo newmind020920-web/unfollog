@@ -8,23 +8,34 @@ import { readZipIndex, readZipEntryText, ZipError, type ZipEntry } from './zip'
  *  - 내보내기 ZIP 통째로
  *  - connections/followers_and_following/ 안의 followers_*.json / following.json
  *  - 같은 폴더의 HTML 버전
+ *
+ * 팔로워·팔로잉 외에 두 파일을 더 읽습니다. 화면에 목록으로 보여주려는 것이 아니라,
+ * 누군가 사라졌을 때 "상대가 끊은 것인지, 내가 끊은 것인지"를 가리는 근거로만 씁니다.
+ *  - recently_unfollowed_profiles.json : 내가 최근에 언팔한 계정
+ *  - blocked_profiles.json             : 내가 차단한 계정
  */
 
 /** 팔로워 목록 파일인가 (다른 관계 파일은 전부 제외) */
 const FOLLOWERS_FILE = /^followers(?:[_-]?\d+)?\.(json|html?)$/i
 /** 팔로잉 목록 파일인가 */
 const FOLLOWING_FILE = /^following(?:[_-]?\d+)?\.(json|html?)$/i
+/** 내가 최근에 언팔한 계정 */
+const MY_UNFOLLOWS_FILE = /^recently_unfollowed_(?:profiles|accounts)\.(json|html?)$/i
+/** 내가 차단한 계정 */
+const MY_BLOCKS_FILE = /^blocked_(?:profiles|accounts)\.(json|html?)$/i
 
 function basename(path: string) {
   return path.split(/[\\/]/).pop() ?? path
 }
 
-export type FileKind = 'followers' | 'following' | null
+export type FileKind = 'followers' | 'following' | 'unfollowedByMe' | 'blockedByMe' | null
 
 export function classifyFileName(path: string): FileKind {
   const name = basename(path)
   if (FOLLOWERS_FILE.test(name)) return 'followers'
   if (FOLLOWING_FILE.test(name)) return 'following'
+  if (MY_UNFOLLOWS_FILE.test(name)) return 'unfollowedByMe'
+  if (MY_BLOCKS_FILE.test(name)) return 'blockedByMe'
   return null
 }
 
@@ -33,6 +44,8 @@ function usernameFromHref(href: string): string | null {
     const url = new URL(href)
     if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return null
     const seg = url.pathname.split('/').filter(Boolean)
+    // 최근 내보내기는 프로필 주소를 /_u/<아이디> 로 적기도 합니다.
+    if (seg.length === 2 && seg[0] === '_u') return decodeURIComponent(seg[1])
     if (seg.length !== 1) return null // /p/..., /explore/..., /stories/... 는 프로필이 아님
     return decodeURIComponent(seg[0])
   } catch {
@@ -88,12 +101,14 @@ function collectFromJson(node: unknown, out: Map<string, IgUser>, depth = 0) {
   const obj = node as Record<string, unknown>
   const sld = obj.string_list_data
   if (Array.isArray(sld)) {
+    const title = typeof obj.title === 'string' ? obj.title.trim() : ''
     for (const raw of sld) {
       if (!raw || typeof raw !== 'object') continue
       const item = raw as Record<string, unknown>
       const href = typeof item.href === 'string' ? item.href : ''
       const value = typeof item.value === 'string' ? item.value : ''
-      const name = value || (href ? usernameFromHref(href) ?? '' : '')
+      // 형식에 따라 아이디가 value, 주소, title 중 한 곳에만 들어 있습니다.
+      const name = value || (href ? usernameFromHref(href) ?? '' : '') || title
       if (name) pushUser(out, name, href, item.timestamp)
     }
     // title 에만 이름이 있고 string_list_data 가 빈 경우
@@ -122,6 +137,8 @@ function guessKindFromContent(text: string): FileKind {
   const head = text.slice(0, 4096)
   if (/relationships_following/.test(head)) return 'following'
   if (/relationships_followers/.test(head)) return 'followers'
+  if (/relationships_unfollowed_users/.test(head)) return 'unfollowedByMe'
+  if (/relationships_blocked_users/.test(head)) return 'blockedByMe'
   return null
 }
 
@@ -143,6 +160,9 @@ function parseText(text: string, path: string, kindHint: FileKind) {
 type Collected = {
   followers: Map<string, IgUser>
   following: Map<string, IgUser>
+  /** 파일이 없었으면 undefined — "기록이 비어 있음"과 "기록을 모름"을 구분합니다 */
+  unfollowedByMe?: Map<string, IgUser>
+  blockedByMe?: Map<string, IgUser>
   sources: ParseResult['sources']
   warnings: string[]
 }
@@ -161,6 +181,16 @@ function merge(target: Map<string, IgUser>, users: IgUser[]) {
 function absorb(c: Collected, path: string, text: string) {
   const declared = classifyFileName(path)
   const { users, kind } = parseText(text, path, declared)
+
+  // 보조 파일은 비어 있어도 "있었다"는 사실 자체가 판별 근거입니다.
+  if (kind === 'unfollowedByMe') {
+    merge((c.unfollowedByMe ??= new Map()), users)
+    return
+  }
+  if (kind === 'blockedByMe') {
+    merge((c.blockedByMe ??= new Map()), users)
+    return
+  }
   if (!users.length) return
 
   if (kind === 'followers') {
@@ -185,7 +215,11 @@ async function absorbZip(c: Collected, file: File) {
   }
 
   const wanted = index.filter((e) => classifyFileName(e.name) !== null)
-  if (!wanted.length) {
+  const hasLists = wanted.some((e) => {
+    const kind = classifyFileName(e.name)
+    return kind === 'followers' || kind === 'following'
+  })
+  if (!hasLists) {
     throw new ZipError(
       'ZIP 안에서 followers / following 파일을 찾지 못했습니다. ' +
         '"팔로워 및 팔로잉" 항목을 포함해 내보냈는지 확인해 주세요.',
@@ -238,6 +272,8 @@ export async function parseFiles(files: File[]): Promise<ParseResult> {
   return {
     followers: Array.from(c.followers.values()),
     following: Array.from(c.following.values()),
+    unfollowedByMe: c.unfollowedByMe ? Array.from(c.unfollowedByMe.values()) : undefined,
+    blockedByMe: c.blockedByMe ? Array.from(c.blockedByMe.values()) : undefined,
     sources: c.sources,
     warnings: c.warnings,
   }

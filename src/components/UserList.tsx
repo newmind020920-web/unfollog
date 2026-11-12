@@ -48,11 +48,17 @@ export function UserList({
   csvName,
   empty,
   timeline,
+  notes,
+  tags,
 }: {
   users: IgUser[]
   csvName: string
   empty: ReactNode
   timeline?: Timeline
+  /** 사용자명 → 행 아래 설명. 떠난 시점 대신 보여줍니다 */
+  notes?: Map<string, string>
+  /** 사용자명 → 이름 옆 꼬리표 */
+  tags?: Map<string, string>
 }) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>(timeline ? 'leftRecent' : 'recent')
@@ -180,7 +186,11 @@ export function UserList({
                 key={user.username}
                 className="relative after:absolute after:right-0 after:bottom-0 after:left-[70px] after:h-px after:bg-line last:after:hidden"
               >
-                <Row user={user} note={timeline?.get(user.username)?.label} />
+                <Row
+                  user={user}
+                  note={notes?.get(user.username) ?? timeline?.get(user.username)?.label}
+                  tag={tags?.get(user.username)}
+                />
               </li>
             ))}
           </ul>
@@ -208,7 +218,7 @@ export function UserList({
   )
 }
 
-function Row({ user, note }: { user: IgUser; note?: string }) {
+function Row({ user, note, tag }: { user: IgUser; note?: string; tag?: string }) {
   const body = (
     <>
       <span
@@ -218,7 +228,14 @@ function Row({ user, note }: { user: IgUser; note?: string }) {
         {user.display.replace(/^demo_/, '').slice(0, 1)}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] leading-[1.4] font-semibold">@{user.display}</span>
+        <span className="flex items-center gap-2">
+          <span className="truncate text-[16px] leading-[1.4] font-semibold">@{user.display}</span>
+          {tag && (
+            <span className="shrink-0 rounded-md bg-sunken px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+              {tag}
+            </span>
+          )}
+        </span>
         {note ? (
           <span className="tnum mt-0.5 block truncate text-[13px] text-faint">{note}</span>
         ) : (

@@ -112,7 +112,7 @@ export function Spinner({ className }: { className?: string }) {
 export type IconName =
   | 'upload' | 'lock' | 'search' | 'download' | 'trash' | 'external'
   | 'check' | 'info' | 'clock' | 'chevron' | 'logo' | 'x' | 'pencil' | 'copy'
-  | 'user' | 'users' | 'userMinus' | 'userPlus' | 'userCheck' | 'userX' | 'swap' | 'layers'
+  | 'user' | 'users' | 'userMinus' | 'userPlus' | 'userCheck' | 'userX' | 'swap' | 'layers' | 'ban'
 
 /** 사람 아이콘의 공통 몸통 — 오른쪽에 기호를 붙여 변형합니다 */
 const PERSON = (
@@ -159,6 +159,7 @@ const PATHS: Record<IconName, ReactNode> = {
   userCheck: (<>{PERSON}<path d="M16.8 10.7l1.8 1.8 3.3-3.7" /></>),
   userX: (<>{PERSON}<path d="M17.4 8.4l4.2 4.2M21.6 8.4l-4.2 4.2" /></>),
   swap: (<><path d="M6 8.5h12m0 0l-3-3m3 3l-3 3" /><path d="M18 15.5H6m0 0l3-3m-3 3l3 3" /></>),
+  ban: (<><circle cx="12" cy="12" r="8.5" /><path d="M6 6l12 12" /></>),
   layers: (<><path d="M12 4.5l8 4-8 4-8-4 8-4z" /><path d="M4 12.5l8 4 8-4" /><path d="M4 16l8 4 8-4" /></>),
 }
 

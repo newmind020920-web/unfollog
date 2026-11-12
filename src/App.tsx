@@ -4,7 +4,6 @@ import {
   analyze,
   compare,
   departureTracker,
-  mayContainRenames,
   type Analysis,
   type Comparison,
   type Departure,
@@ -45,6 +44,8 @@ import {
 const VIEWS = [
   'home',
   'unfollowers',
+  'maybe-blocked',
+  'renamed',
   'new-followers',
   'followers',
   'following',
@@ -70,6 +71,12 @@ type ListDef = {
   users: IgUser[] | null
   /** 떠난 시점 — 구간이 둘 이상일 때만 채웁니다 */
   timeline?: Timeline
+  /** 행 아래 설명 (떠난 시점 대신) */
+  notes?: Map<string, string>
+  /** 이름 옆 꼬리표 */
+  tags?: Map<string, string>
+  /** 목록 위 안내문 */
+  footnote?: string
   csv: string
   emptyTitle: string
   emptyBody: string
@@ -285,6 +292,9 @@ export default function App() {
           label: newSnapshotLabel(createdAt, existing),
           followers: result.followers,
           following: result.following,
+          // 누가 끊었는지 가리는 근거 — 파일이 없었으면 undefined 로 둡니다.
+          ...(result.unfollowedByMe ? { unfollowedByMe: result.unfollowedByMe } : {}),
+          ...(result.blockedByMe ? { blockedByMe: result.blockedByMe } : {}),
         }
         await putSnapshot(snapshot)
         await refresh(snapshot.id)
@@ -524,8 +534,8 @@ function Landing({
 
       <Card className="mt-3 px-5 py-2">
         <ul>
-          <PreviewRow icon="userMinus" tone="red" label="나를 언팔한 사람" body="지난번 파일과 비교해서 찾아요" />
-          <PreviewRow icon="users" tone="blue" label="나를 팔로우하는 사람" body="지금 내 팔로워 전체 목록" />
+          <PreviewRow icon="userMinus" tone="red" label="나를 언팔한 사람" body="누가, 대략 언제 떠났는지 찾아요" />
+          <PreviewRow icon="ban" tone="red" label="나를 차단했을 수 있는 사람" body="서로 팔로우하다 양쪽에서 함께 사라진 계정" />
           <PreviewRow icon="userX" tone="neutral" label="나를 맞팔하지 않는 사람" body="내가 팔로우하지만 상대는 안 하는 계정" last />
         </ul>
       </Card>
@@ -631,21 +641,70 @@ function buildLists(
 ): Record<ListView, ListDef> {
   const since = baseline ? `‘${baseline.label}’` : '지난번'
   const timeline = trace ? buildTimeline(trace, now) : undefined
-  const multiStep = timeline !== undefined
+  const ready = trace !== null && trace.times.length >= 2
+
+  // 사라진 사람을 이유별로 나눕니다.
+  const left = ready ? trace.departures.filter((d) => d.reason !== 'blockedOrGone') : null
+  const maybeBlocked = ready ? trace.departures.filter((d) => d.reason === 'blockedOrGone') : null
+  const renames = ready ? trace.renames : null
+  const unsure = new Map(
+    (left ?? []).filter((d) => d.reason === 'unknown').map((d) => [d.user.username, '차단일 수도']),
+  )
+  const renamedTo = new Set((renames ?? []).map((r) => r.to.username))
+
+  const timingNote = timeline
+    ? ' 떠난 시점은 파일을 올린 두 시점 사이 구간으로만 알 수 있어서 어림값이에요.'
+    : ''
+  const myBlocksNote =
+    trace && trace.blockedByMeCount > 0 ? ` 내가 차단한 ${num(trace.blockedByMeCount)}명은 뺐어요.` : ''
+  const howToCheck =
+    '확인하는 방법: 아이디를 눌러 프로필을 열어 보세요. 로그인한 상태에서는 안 보이는데 로그아웃한 브라우저에서는 보이면 차단이에요. 둘 다 안 보이면 계정이 비활성화되거나 삭제된 거예요.'
+
   return {
     unfollowers: {
       view: 'unfollowers',
       label: '나를 언팔한 사람',
-      description: multiStep
-        ? `${since} 이후 저장된 스냅샷을 모두 훑어서 찾았어요. 떠난 시점은 파일을 올린 두 시점 사이 구간으로만 알 수 있어서 어림값이에요.`
-        : `${since} 스냅샷에서는 나를 팔로우했지만 지금은 팔로우하지 않는 계정이에요.`,
+      description: `${since} 스냅샷에서는 나를 팔로우했지만 지금은 팔로우하지 않는 계정이에요.${timingNote}${myBlocksNote}`,
       icon: 'userMinus',
       tone: 'red',
-      users: trace && trace.times.length >= 2 ? trace.departures.map((d) => d.user) : null,
+      users: left ? left.map((d) => d.user) : null,
       timeline,
+      tags: unsure.size ? unsure : undefined,
+      footnote: unsure.size
+        ? '‘차단일 수도’ 표시는 내가 팔로우하지 않던 계정이에요. 이 경우에는 상대가 언팔한 건지 차단한 건지 파일만으로 구분할 수 없어요. 표시가 없는 계정은 언팔이 확실해요.'
+        : undefined,
       csv: 'instafloww-나를-언팔한-사람',
       emptyTitle: '나를 언팔한 사람이 없어요',
       emptyBody: '저장된 스냅샷 사이에 떠난 팔로워가 한 명도 없어요.',
+    },
+    'maybe-blocked': {
+      view: 'maybe-blocked',
+      label: '나를 차단했을 수 있는 사람',
+      description: `서로 팔로우하던 사이인데, 내가 끊지 않았는데도 내 팔로워와 팔로잉 양쪽에서 함께 사라진 계정이에요. 상대가 나를 차단했거나, 계정을 비활성화·삭제하면 이렇게 돼요.${timingNote}`,
+      icon: 'ban',
+      tone: 'red',
+      users: maybeBlocked ? maybeBlocked.map((d) => d.user) : null,
+      timeline,
+      footnote:
+        trace && !trace.hasUnfollowLog
+          ? `올린 파일에 ‘최근에 언팔한 계정’ 기록이 없어서, 내가 직접 언팔한 계정이 섞여 있을 수 있어요. ${howToCheck}`
+          : howToCheck,
+      csv: 'instafloww-나를-차단했을-수-있는-사람',
+      emptyTitle: '차단했을 수 있는 사람이 없어요',
+      emptyBody: '서로 팔로우하다가 양쪽 목록에서 함께 사라진 계정이 없어요.',
+    },
+    renamed: {
+      view: 'renamed',
+      label: '아이디를 바꾼 사람',
+      description:
+        '옛 아이디가 사라지고 새 아이디가 생겼는데, 나를 팔로우한 시각이 초 단위까지 같은 계정이에요. 언팔이 아니라 아이디만 바꾼 것으로 보고 ‘나를 언팔한 사람’에서 뺐어요.',
+      icon: 'pencil',
+      tone: 'neutral',
+      users: renames ? renames.map((r) => r.to) : null,
+      notes: new Map((renames ?? []).map((r) => [r.to.username, `예전 아이디 @${r.from.display}`])),
+      csv: 'instafloww-아이디를-바꾼-사람',
+      emptyTitle: '아이디를 바꾼 사람이 없어요',
+      emptyBody: '팔로우 시각이 같은 옛 아이디·새 아이디 쌍이 없어요.',
     },
     'new-followers': {
       view: 'new-followers',
@@ -653,7 +712,8 @@ function buildLists(
       description: `${since} 스냅샷 이후에 새로 나를 팔로우한 계정이에요.`,
       icon: 'userPlus',
       tone: 'green',
-      users: comparison?.newFollowers ?? null,
+      // 아이디만 바꾼 계정은 새 팔로워가 아닙니다.
+      users: comparison ? comparison.newFollowers.filter((u) => !renamedTo.has(u.username)) : null,
       csv: 'instafloww-새로-나를-팔로우한-사람',
       emptyTitle: '새로 팔로우한 사람이 없어요',
       emptyBody: '두 스냅샷 사이에 새로 생긴 팔로워가 없어요.',
@@ -753,11 +813,7 @@ function Workspace(props: WorkspaceProps) {
         title={def.label}
         count={def.users?.length}
         description={def.users ? def.description : undefined}
-        footnote={
-          view === 'unfollowers' && comparison && mayContainRenames(comparison)
-            ? '아이디를 바꾼 계정이나 탈퇴·비활성화·차단된 계정도 여기에 섞여 보일 수 있어요. 같은 사람이 ‘새로 나를 팔로우한 사람’에도 다른 아이디로 있다면 아이디를 바꾼 거예요.'
-            : undefined
-        }
+        footnote={def.users?.length ? def.footnote : undefined}
         onBack={back}
       >
         {def.users ? (
@@ -765,6 +821,8 @@ function Workspace(props: WorkspaceProps) {
             key={def.view}
             users={def.users}
             timeline={def.timeline}
+            notes={def.notes}
+            tags={def.tags}
             csvName={def.csv}
             empty={<Empty icon="check" tone="green" title={def.emptyTitle} body={def.emptyBody} />}
           />
@@ -791,6 +849,7 @@ function Home({
   lists,
 }: WorkspaceProps & { lists: Record<ListView, ListDef> }) {
   const unfollowed = lists.unfollowers.users?.length ?? null
+  const maybeBlocked = lists['maybe-blocked'].users?.length ?? 0
   const oneWay = analysis.notFollowingBack.length
   // 스냅샷이 셋 이상이면 "지난번"이 아니라 실제 시작 날짜를 말해 줍니다.
   const since =
@@ -850,6 +909,16 @@ function Home({
             <>{formatDay(current.createdAt)} 기준 · 나를 언팔한 사람은 파일을 한 번 더 올리면 알 수 있어요</>
           )}
         </p>
+        {maybeBlocked > 0 && (
+          <button
+            onClick={() => go('maybe-blocked')}
+            data-blocked-hint
+            className="ko mt-3 inline-flex items-center gap-1 rounded-full bg-red-weak py-1.5 pr-2 pl-3 text-[14px] font-semibold text-red"
+          >
+            나를 차단했을 수 있는 사람도 {num(maybeBlocked)}명 있어요
+            <Icon name="chevron" size={15} />
+          </button>
+        )}
       </div>
 
       <MenuGroup title="지난번과 달라진 것">
@@ -858,7 +927,15 @@ function Home({
           onOpen={go}
           hint={lists.unfollowers.timeline ? '누가 언제 떠났는지까지 보여줘요' : undefined}
         />
-        <MenuRow def={lists['new-followers']} onOpen={go} last />
+        <MenuRow
+          def={lists['maybe-blocked']}
+          onOpen={go}
+          hint="서로 팔로우하다 양쪽에서 함께 사라졌어요"
+        />
+        <MenuRow def={lists['new-followers']} onOpen={go} last={!lists.renamed.users?.length} />
+        {lists.renamed.users && lists.renamed.users.length > 0 && (
+          <MenuRow def={lists.renamed} onOpen={go} hint="언팔이 아니라 아이디만 바뀌었어요" last />
+        )}
       </MenuGroup>
 
       <MenuGroup title="지금 내 팔로우 관계">

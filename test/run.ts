@@ -58,9 +58,12 @@ async function main() {
     const r = await parseFiles([zipFile('instagram-export.zip', zip)])
     eq('팔로워 4명', r.followers.map((u) => u.username), ['alice', 'bob', 'carol', 'dave'])
     eq('팔로잉 3명', r.following.map((u) => u.username), ['alice', 'bob', 'erin'])
-    check('보류 중 요청/차단/친한친구 제외', !JSON.stringify(r).includes('spammer') &&
-      !JSON.stringify(r).includes('bestie') && !JSON.stringify(r).includes('blockeduser') &&
-      !JSON.stringify(r).includes('oldfriend'))
+    check('보류 중 요청/친한친구는 어디에도 없음', !JSON.stringify(r).includes('spammer') &&
+      !JSON.stringify(r).includes('bestie'))
+    const lists = JSON.stringify([r.followers, r.following])
+    check('내 언팔·차단 기록이 팔로워/팔로잉에 섞이지 않음', !lists.includes('oldfriend') && !lists.includes('blockeduser'))
+    eq('내가 언팔한 계정은 따로 보관', r.unfollowedByMe?.map((u) => u.username), ['oldfriend'])
+    eq('내가 차단한 계정은 따로 보관', r.blockedByMe?.map((u) => u.username), ['blockeduser'])
     eq('읽은 파일 2개', r.sources.length, 2)
     eq('경고 없음', r.warnings, [])
     eq('팔로우 시각 보존', r.followers[0].followedAt, 1700000000)
@@ -196,6 +199,107 @@ async function main() {
     const d = tracker.result().departures[0]
     eq('최신 표시 이름 사용', d.user.display, 'Zoe_NEW')
     eq('구간은 b~c', [d.lastSeenAt, d.goneByAt], [2, 3])
+  }
+
+  console.log('\n왜 사라졌는지 가리기 (언팔 / 차단 가능성 / 구분 불가)')
+  {
+    const u = (n: string, at?: number) => ({ username: n, display: n, href: '', followedAt: at })
+    const snap = (
+      at: number,
+      followers: string[],
+      following: string[],
+      extra: Partial<Snapshot> = {},
+    ): Snapshot => ({
+      id: String(at), createdAt: at, label: String(at),
+      followers: followers.map((n) => u(n)),
+      following: following.map((n) => u(n)),
+      ...extra,
+    })
+
+    const tracker = departureTracker()
+    // 지난번: 다섯 명이 나를 팔로우. 나는 그중 ann, ben, cat, dan 을 팔로우.
+    tracker.add(snap(1, ['ann', 'ben', 'cat', 'dan', 'eve', 'fay'], ['ann', 'ben', 'cat', 'dan', 'fay']))
+    // 지금: 다섯 명 모두 내 팔로워에서 사라짐.
+    //  ann — 내 팔로잉에는 그대로            → 언팔 확실
+    //  ben — 내 팔로잉에서도 사라짐, 내가 끊지 않음 → 차단 또는 계정 사라짐
+    //  cat — 내 팔로잉에서도 사라짐, 내가 언팔함   → 구분 불가
+    //  dan — 내가 차단함                      → 목록에서 제외
+    //  eve — 내가 팔로우한 적 없음             → 구분 불가
+    //  fay — 그대로 팔로워
+    tracker.add(snap(2, ['fay'], ['ann', 'fay'], {
+      unfollowedByMe: [u('cat')],
+      blockedByMe: [u('dan')],
+    }))
+    const t = tracker.result()
+    const reason = (n: string) => t.departures.find((d) => d.user.username === n)?.reason
+    eq('ann: 내 팔로잉에 남아 있음 → 언팔', reason('ann'), 'unfollowed')
+    eq('ben: 내가 끊지 않았는데 양쪽에서 사라짐 → 차단 가능성', reason('ben'), 'blockedOrGone')
+    eq('cat: 내가 언팔한 기록 있음 → 구분 불가', reason('cat'), 'unknown')
+    eq('eve: 내가 팔로우하지 않던 계정 → 구분 불가', reason('eve'), 'unknown')
+    eq('dan: 내가 차단한 계정은 제외', reason('dan'), undefined)
+    eq('내가 차단해서 빠진 수', t.blockedByMeCount, 1)
+    eq('떠난 사람 4명', t.departures.length, 4)
+    eq('언팔 기록 파일이 있었음', t.hasUnfollowLog, true)
+
+    const noLog = departureTracker()
+    noLog.add(snap(1, ['ben'], ['ben']))
+    noLog.add(snap(2, [], []))
+    eq('언팔 기록 파일이 없으면 표시', noLog.result().hasUnfollowLog, false)
+    eq('기록이 없어도 차단 가능성으로 분류', noLog.result().departures[0].reason, 'blockedOrGone')
+  }
+
+  console.log('\n아이디 변경 찾기 (팔로우 시각이 같음)')
+  {
+    const u = (n: string, at?: number) => ({ username: n, display: n, href: '', followedAt: at })
+    const snap = (at: number, followers: ReturnType<typeof u>[], following: ReturnType<typeof u>[]): Snapshot => ({
+      id: String(at), createdAt: at, label: String(at), followers, following,
+    })
+    // 스냅샷 시각은 ms, 팔로우 시각은 초. T1 에 첫 스냅샷, 일주일 뒤 T2.
+    const T1 = 1_700_000_000_000
+    const T2 = T1 + 7 * 86_400_000
+    const OLD = 1_650_000_000 // 첫 스냅샷보다 훨씬 전에 한 팔로우
+    const RECENT = T1 / 1000 + 3600 // 첫 스냅샷 한 시간 뒤에 한 팔로우
+
+    const tracker = departureTracker()
+    tracker.add(snap(T1, [u('old_name', OLD), u('leaver', OLD + 1), u('stay', OLD + 2)], [u('old_name', 900)]))
+    // old_name → new_name (팔로우 시각 그대로). leaver 는 진짜로 떠남. brand_new 는 새 팔로워.
+    tracker.add(snap(T2, [u('new_name', OLD), u('stay', OLD + 2), u('brand_new', RECENT)], [u('new_name', 900)]))
+    const t = tracker.result()
+    eq('아이디 변경 1건', t.renames.map((r) => [r.from.username, r.to.username]), [['old_name', 'new_name']])
+    eq('아이디 바꾼 계정은 떠난 사람에서 제외', t.departures.map((d) => d.user.username), ['leaver'])
+
+    // 같은 초에 팔로우한 계정이 여럿이면 누가 누구인지 알 수 없으므로 짝짓지 않습니다.
+    const ambiguous = departureTracker()
+    ambiguous.add(snap(T1, [u('a1', OLD), u('a2', OLD)], []))
+    ambiguous.add(snap(T2, [u('b1', OLD)], []))
+    eq('시각이 겹치면 짝짓지 않음', ambiguous.result().renames, [])
+    eq('그 경우 둘 다 떠난 사람으로 남김', ambiguous.result().departures.length, 2)
+
+    // 떠난 뒤가 아니라 원래부터 있던 계정과는 짝짓지 않습니다.
+    const coexist = departureTracker()
+    coexist.add(snap(T1, [u('x', OLD), u('y', OLD)], []))
+    coexist.add(snap(T2, [u('y', OLD)], []))
+    eq('원래 있던 계정과는 짝짓지 않음', coexist.result().renames, [])
+
+    // 떠난 사람과 진짜 새 팔로워의 시각이 우연히 같아도, 그 팔로우가 지난 스냅샷 뒤에
+    // 일어난 것이면 새 팔로워입니다.
+    const coincidence = departureTracker()
+    coincidence.add(snap(T1, [u('gone', RECENT)], []))
+    coincidence.add(snap(T2, [u('fresh', RECENT)], []))
+    eq('지난 스냅샷 뒤의 팔로우는 아이디 변경이 아님', coincidence.result().renames, [])
+    eq('떠난 사람으로 남김', coincidence.result().departures.map((d) => d.user.username), ['gone'])
+  }
+
+  console.log('\n최근 내보내기 형식 (아이디가 title 에, 주소는 /_u/)')
+  {
+    const r = await parseFiles([
+      new File([JSON.stringify({ relationships_following: [
+        { title: 'New.Format', string_list_data: [{ href: 'https://www.instagram.com/_u/New.Format', timestamp: 1700000000 }] },
+        { title: 'TitleOnly', string_list_data: [{ timestamp: 1700000001 }] },
+      ] })], 'following.json'),
+    ])
+    eq('title 과 /_u/ 주소에서 아이디를 읽음', r.following.map((u) => u.username), ['new.format', 'titleonly'])
+    eq('팔로우 시각 유지', r.following[0].followedAt, 1700000000)
   }
 
   console.log('\n대소문자/비프로필 링크 처리')

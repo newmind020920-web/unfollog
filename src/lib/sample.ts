@@ -5,7 +5,8 @@ import type { IgUser, Snapshot } from '../types'
  * 실제 계정과 헷갈리지 않도록 아이디는 모두 demo_ 로 시작하고,
  * 프로필 링크는 만들지 않습니다.
  *
- * 떠난 시점 추적을 체험에서도 볼 수 있도록 스냅샷을 셋 만듭니다.
+ * 떠난 시점 추적을 체험에서도 볼 수 있도록 스냅샷을 셋 만들고,
+ * 언팔 · 차단 가능성 · 아이디 변경이 각각 보이도록 상황을 섞어 둡니다.
  */
 
 const WORDS = [
@@ -55,12 +56,20 @@ export function buildSampleSnapshots(now: number): [Snapshot, Snapshot, Snapshot
     followedAt: nowSec - (i + 1) * DAY,
   }))
 
+  // 마지막 주에 서로 팔로우하던 한 명이 양쪽 목록에서 함께 사라지고(차단 가능성),
+  // 한 명은 아이디만 바꿉니다(팔로우 시각은 그대로).
+  // (mutual[4] 가 사라지는 사람 — 아래 오늘 스냅샷의 양쪽 목록에서 모두 빠집니다)
+  const renamedFrom = mutual[5]
+  const renamedTo: IgUser = { ...renamedFrom, username: 'demo_newname.log', display: 'demo_newname.log' }
+  const stayedMutual = mutual.slice(6)
+
   const twoWeeksAgo: Snapshot = {
     id: 'sample-0',
     createdAt: now - 17 * DAY_MS,
     label: '샘플 · 2주 전',
     followers: [...mutual, ...fans],
     following: [...mutual, ...oneWay],
+    unfollowedByMe: [],
     sample: true,
   }
 
@@ -71,6 +80,7 @@ export function buildSampleSnapshots(now: number): [Snapshot, Snapshot, Snapshot
     label: '샘플 · 지난주',
     followers: [...mutual.slice(2), ...fans.slice(1), ...joinedWeek1],
     following: [...mutual, ...oneWay],
+    unfollowedByMe: [],
     sample: true,
   }
 
@@ -79,8 +89,15 @@ export function buildSampleSnapshots(now: number): [Snapshot, Snapshot, Snapshot
     id: 'sample-2',
     createdAt: now,
     label: '샘플 · 오늘',
-    followers: [...mutual.slice(4), ...fans.slice(3), ...joinedWeek1, ...joinedWeek2],
-    following: [...mutual, ...oneWay, ...followedLater],
+    followers: [renamedTo, ...stayedMutual, ...fans.slice(3), ...joinedWeek1, ...joinedWeek2],
+    following: [
+      ...mutual.slice(0, 4), // 나를 언팔했지만 나는 아직 팔로우 중
+      renamedTo,
+      ...stayedMutual,
+      ...oneWay,
+      ...followedLater,
+    ],
+    unfollowedByMe: [],
     sample: true,
   }
 
