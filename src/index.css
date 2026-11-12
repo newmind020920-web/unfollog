@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #08080a;
+  --color-surface: #101014;
+  --color-surface-2: #17171d;
+  --color-surface-3: #1f1f27;
+  --color-line: #27272f;
+  --color-line-strong: #383842;
+  --color-fg: #f4f4f5;
+  --color-muted: #90909d;
+  --color-faint: #63636e;
+  --color-brand: #a855f7;
+  --color-brand-soft: #2a1740;
+  --color-danger: #fb7185;
+  --color-danger-soft: #3a1620;
+  --color-success: #34d399;
+  --color-success-soft: #0f2e24;
+  --color-info: #60a5fa;
+  --color-info-soft: #13233d;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo",
+    "Pretendard Variable", Pretendard, "Malgun Gothic", "Noto Sans KR", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 숫자가 바뀔 때 폭이 흔들리지 않도록 */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: #fff;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* 배경 글로우 */
+.aurora::before {
+  content: "";
+  position: fixed;
+  inset: -20% 0 auto 0;
+  height: 60vh;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(45% 50% at 20% 0%, rgba(168, 85, 247, 0.16), transparent 70%),
+    radial-gradient(40% 45% at 80% 10%, rgba(96, 165, 250, 0.12), transparent 70%);
+}
