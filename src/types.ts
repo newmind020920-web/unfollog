@@ -18,6 +18,8 @@ export type Snapshot = {
   label: string
   followers: IgUser[]
   following: IgUser[]
+  /** 체험용 샘플 데이터인가 — 실제 업로드와 섞이지 않게 구분합니다 */
+  sample?: boolean
 }
 
 /** IndexedDB에 저장할 때 목록을 뺀 요약 정보 */
@@ -27,6 +29,7 @@ export type SnapshotMeta = {
   label: string
   followerCount: number
   followingCount: number
+  sample?: boolean
 }
 
 export type ParseResult = {

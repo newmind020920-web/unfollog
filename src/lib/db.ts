@@ -3,26 +3,57 @@ import type { Snapshot, SnapshotMeta } from '../types'
 /**
  * 스냅샷 저장소. IndexedDB 만 사용합니다 — 데이터는 이 브라우저를 떠나지 않습니다.
  * 목록 조회가 팔로워 배열 전체를 읽지 않도록 메타 스토어를 분리했습니다.
+ *
+ * 시크릿 창이나 저장이 막힌 환경에서는 IndexedDB 가 실패하므로,
+ * 그때는 메모리에만 담아 두고 앱은 그대로 동작하게 합니다.
  */
 
 const DB_NAME = 'instafloww'
 const DB_VERSION = 1
 const STORE_FULL = 'snapshots'
 const STORE_META = 'meta'
+const OPEN_TIMEOUT_MS = 4000
 
 let dbPromise: Promise<IDBDatabase> | null = null
+
+const memory = new Map<string, Snapshot>()
+let memoryOnly = false
+
+/** 스냅샷이 브라우저에 실제로 남는가 (false 면 창을 닫으면 사라짐) */
+export function isPersistent() {
+  return !memoryOnly
+}
 
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    // 일부 환경에서는 open 요청이 성공도 실패도 하지 않고 멈춥니다.
+    const timer = setTimeout(() => reject(new Error('IndexedDB 응답 없음')), OPEN_TIMEOUT_MS)
+    let req: IDBOpenDBRequest
+    try {
+      req = indexedDB.open(DB_NAME, DB_VERSION)
+    } catch (err) {
+      clearTimeout(timer)
+      reject(err)
+      return
+    }
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(STORE_FULL)) db.createObjectStore(STORE_FULL, { keyPath: 'id' })
       if (!db.objectStoreNames.contains(STORE_META)) db.createObjectStore(STORE_META, { keyPath: 'id' })
     }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error ?? new Error('IndexedDB 를 열 수 없습니다.'))
+    req.onsuccess = () => {
+      clearTimeout(timer)
+      resolve(req.result)
+    }
+    req.onerror = () => {
+      clearTimeout(timer)
+      reject(req.error ?? new Error('IndexedDB 를 열 수 없습니다.'))
+    }
+    req.onblocked = () => {
+      clearTimeout(timer)
+      reject(new Error('IndexedDB 가 다른 탭에 막혀 있습니다.'))
+    }
   })
   return dbPromise
 }
@@ -45,6 +76,17 @@ function run<T>(
   )
 }
 
+/** IndexedDB 를 먼저 시도하고, 실패하면 그 뒤로는 메모리만 씁니다. */
+async function withFallback<T>(idb: () => Promise<T>, mem: () => T): Promise<T> {
+  if (memoryOnly) return mem()
+  try {
+    return await idb()
+  } catch {
+    memoryOnly = true
+    return mem()
+  }
+}
+
 export function toMeta(s: Snapshot): SnapshotMeta {
   return {
     id: s.id,
@@ -52,42 +94,71 @@ export function toMeta(s: Snapshot): SnapshotMeta {
     label: s.label,
     followerCount: s.followers.length,
     followingCount: s.following.length,
+    ...(s.sample ? { sample: true } : {}),
   }
 }
 
 export async function putSnapshot(snapshot: Snapshot): Promise<void> {
-  await run([STORE_FULL, STORE_META], 'readwrite', ([full, meta]) => {
-    full.put(snapshot)
-    meta.put(toMeta(snapshot))
-  })
+  await withFallback(
+    async () => {
+      await run([STORE_FULL, STORE_META], 'readwrite', ([full, meta]) => {
+        full.put(snapshot)
+        meta.put(toMeta(snapshot))
+      })
+    },
+    () => {
+      memory.set(snapshot.id, snapshot)
+    },
+  )
 }
 
 export async function getSnapshot(id: string): Promise<Snapshot | undefined> {
-  return await run<Snapshot>([STORE_FULL], 'readonly', ([full]) => full.get(id) as IDBRequest<Snapshot>)
+  return await withFallback(
+    () => run<Snapshot>([STORE_FULL], 'readonly', ([full]) => full.get(id) as IDBRequest<Snapshot>),
+    () => memory.get(id),
+  )
 }
 
 export async function listSnapshots(): Promise<SnapshotMeta[]> {
-  const all = await run<SnapshotMeta[]>(
-    [STORE_META],
-    'readonly',
-    ([meta]) => meta.getAll() as IDBRequest<SnapshotMeta[]>,
+  const all = await withFallback(
+    async () =>
+      (await run<SnapshotMeta[]>(
+        [STORE_META],
+        'readonly',
+        ([meta]) => meta.getAll() as IDBRequest<SnapshotMeta[]>,
+      )) ?? [],
+    () => Array.from(memory.values()).map(toMeta),
   )
   // 최신 순
-  return (all ?? []).sort((a, b) => b.createdAt - a.createdAt)
+  return all.sort((a, b) => b.createdAt - a.createdAt)
 }
 
 export async function deleteSnapshot(id: string): Promise<void> {
-  await run([STORE_FULL, STORE_META], 'readwrite', ([full, meta]) => {
-    full.delete(id)
-    meta.delete(id)
-  })
+  await withFallback(
+    async () => {
+      await run([STORE_FULL, STORE_META], 'readwrite', ([full, meta]) => {
+        full.delete(id)
+        meta.delete(id)
+      })
+    },
+    () => {
+      memory.delete(id)
+    },
+  )
 }
 
 export async function clearAll(): Promise<void> {
-  await run([STORE_FULL, STORE_META], 'readwrite', ([full, meta]) => {
-    full.clear()
-    meta.clear()
-  })
+  await withFallback(
+    async () => {
+      await run([STORE_FULL, STORE_META], 'readwrite', ([full, meta]) => {
+        full.clear()
+        meta.clear()
+      })
+    },
+    () => {
+      memory.clear()
+    },
+  )
 }
 
 export async function renameSnapshot(id: string, label: string): Promise<void> {

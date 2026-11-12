@@ -19,7 +19,7 @@ export function Button({
 }: {
   children: ReactNode
   onClick?: () => void
-  variant?: 'default' | 'primary' | 'ghost' | 'danger'
+  variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'card'
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
   title?: string
@@ -37,6 +37,8 @@ export function Button({
     default: 'bg-sunken text-fg-2 hover:bg-line',
     ghost: 'text-muted hover:bg-sunken hover:text-fg',
     danger: 'bg-red-weak text-red hover:brightness-95',
+    /* 옅은 배경 위에 올리는 버튼 */
+    card: 'bg-card text-fg-2 hover:text-fg',
   }
   return (
     <button
@@ -109,7 +111,16 @@ export function Spinner({ className }: { className?: string }) {
 
 export type IconName =
   | 'upload' | 'lock' | 'search' | 'download' | 'trash' | 'external'
-  | 'check' | 'info' | 'clock' | 'chevron' | 'logo' | 'x' | 'pencil'
+  | 'check' | 'info' | 'clock' | 'chevron' | 'logo' | 'x' | 'pencil' | 'copy'
+  | 'user' | 'users' | 'userMinus' | 'userPlus' | 'userCheck' | 'userX' | 'swap' | 'layers'
+
+/** 사람 아이콘의 공통 몸통 — 오른쪽에 기호를 붙여 변형합니다 */
+const PERSON = (
+  <>
+    <circle cx="9.5" cy="8" r="3.5" />
+    <path d="M3 19.5c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5" />
+  </>
+)
 
 const PATHS: Record<IconName, ReactNode> = {
   logo: <path d="M6 18L18 6M18 6v8M18 6h-8" />,
@@ -140,6 +151,15 @@ const PATHS: Record<IconName, ReactNode> = {
   chevron: <path d="M9.5 5.5l6.5 6.5-6.5 6.5" />,
   x: <path d="M6 6l12 12M18 6L6 18" />,
   pencil: (<><path d="M4.5 19.5h4L19 9a2.1 2.1 0 0 0-3-3L5.5 16.5l-1 3z" /></>),
+  copy: (<><rect x="8.5" y="8.5" width="11" height="11" rx="2.5" /><path d="M15.5 8.5V7a2.5 2.5 0 0 0-2.5-2.5H7A2.5 2.5 0 0 0 4.5 7v6A2.5 2.5 0 0 0 7 15.5h1.5" /></>),
+  user: (<>{PERSON}</>),
+  users: (<>{PERSON}<path d="M15.5 4.9a3.5 3.5 0 0 1 0 6.2" /><path d="M18 14.6c1.6.9 2.6 2.6 3 4.9" /></>),
+  userMinus: (<>{PERSON}<path d="M17 10.5h5" /></>),
+  userPlus: (<>{PERSON}<path d="M19.5 8v5M17 10.5h5" /></>),
+  userCheck: (<>{PERSON}<path d="M16.8 10.7l1.8 1.8 3.3-3.7" /></>),
+  userX: (<>{PERSON}<path d="M17.4 8.4l4.2 4.2M21.6 8.4l-4.2 4.2" /></>),
+  swap: (<><path d="M6 8.5h12m0 0l-3-3m3 3l-3 3" /><path d="M18 15.5H6m0 0l3-3m-3 3l3 3" /></>),
+  layers: (<><path d="M12 4.5l8 4-8 4-8-4 8-4z" /><path d="M4 12.5l8 4 8-4" /><path d="M4 16l8 4 8-4" /></>),
 }
 
 export function Icon({

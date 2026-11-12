@@ -38,9 +38,12 @@
  * 다크 모드는 토큰 값만 바꿔 끼웁니다.
  * Tailwind v4 의 @theme 은 미디어 쿼리 안에 둘 수 없어서(:root 로 끌어올려짐)
  * 평범한 CSS 커스텀 속성 오버라이드로 씁니다.
+ *
+ * 테마는 세 가지 상태가 있습니다: 시스템 설정을 따르거나(속성 없음),
+ * data-theme 으로 밝게/어둡게를 명시하거나. 명시한 쪽이 항상 이깁니다.
  */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --color-bg: #17171c;
     --color-card: #202027;
     --color-sunken: #26262e;
@@ -63,11 +66,37 @@
     /* 어두운 배경에서는 그림자가 안 보이므로 얇은 테두리로 대신합니다. */
     --shadow-card: 0 0 0 1px #2b2b34;
     --shadow-float: 0 0 0 1px #35353f, 0 12px 32px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
   }
 }
 
+:root[data-theme='dark'] {
+  --color-bg: #17171c;
+  --color-card: #202027;
+  --color-sunken: #26262e;
+  --color-line: #32323c;
+  --color-line-strong: #43434f;
+
+  --color-fg: #f2f4f6;
+  --color-fg-2: #c7ccd3;
+  --color-muted: #9ba3ad;
+  --color-faint: #7c848e;
+
+  --color-blue: #4593fc;
+  --color-blue-hover: #6aa9fd;
+  --color-blue-weak: #16243a;
+  --color-red: #ff6b78;
+  --color-red-weak: #33191d;
+  --color-green: #2dd68f;
+  --color-green-weak: #112a21;
+
+  /* 어두운 배경에서는 그림자가 안 보이므로 얇은 테두리로 대신합니다. */
+  --shadow-card: 0 0 0 1px #2b2b34;
+  --shadow-float: 0 0 0 1px #35353f, 0 12px 32px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
 html {
-  color-scheme: light dark;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -114,4 +143,32 @@ body {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* 좌우 여백 — 휴대폰 옆면의 시스템 바를 피해 최소 16px 을 지킵니다. */
+.gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* 고정 헤더는 상단 안전 영역 아래에 붙고, 그 위 띠는 배경색으로 칠합니다. */
+.sticky-header {
+  top: env(safe-area-inset-top, 0px);
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--color-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+  .animate-spin {
+    animation-duration: 2.5s;
+  }
 }
