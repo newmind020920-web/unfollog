@@ -93,7 +93,7 @@ export function SnapshotPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-[16px] font-bold">{meta.label}</p>
                   {isCurrent && <Pill tone="blue">지금 보는 것</Pill>}
-                  {isBaseline && <Pill tone="neutral">비교 기준</Pill>}
+                  {isBaseline && <Pill tone="neutral">비교 시작</Pill>}
                   <button
                     onClick={() => {
                       setDraft(meta.label)
@@ -145,7 +145,7 @@ export function SnapshotPanel({
                       variant="card"
                       onClick={() => onPickBaseline(isBaseline ? null : meta.id)}
                     >
-                      {isBaseline ? '비교 기준 해제' : '비교 기준으로'}
+                      {isBaseline ? '비교 시작 해제' : '여기서부터 비교'}
                     </Button>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => setDeletingId(meta.id)}>

@@ -70,3 +70,71 @@ export function compare(prev: Snapshot, curr: Snapshot): Comparison {
 export function mayContainRenames(c: Comparison) {
   return c.unfollowers.length > 0 && c.newFollowers.length > 0
 }
+
+/* ─────────────── 떠난 시점 추적 ───────────────
+ *
+ * 인스타그램은 "언제 언팔당했는지"를 기록해 주지 않습니다.
+ * 저장해 둔 스냅샷을 오래된 것부터 훑으면, 어떤 사람이 마지막으로 팔로워였던
+ * 시점과 사라진 것이 확인된 시점 사이로 구간을 좁힐 수 있습니다.
+ *
+ * 스냅샷을 통째로 배열에 모으면 큰 계정에서 메모리를 많이 쓰므로,
+ * 하나씩 넣어 주는 방식으로 만들었습니다. 사용자명 1개당 항목 하나만 남습니다.
+ */
+
+export type Departure = {
+  user: IgUser
+  /** 마지막으로 팔로워인 것이 확인된 스냅샷 시각 */
+  lastSeenAt: number
+  /** 사라진 것이 처음 확인된 스냅샷 시각 */
+  goneByAt: number
+}
+
+export type DepartureTrace = {
+  /** 최근에 떠난 순 */
+  departures: Departure[]
+  /** 추적에 쓴 스냅샷 시각, 오래된 순 */
+  times: number[]
+  /** 서로 다른 이탈 구간의 수 — 2 이상이면 사람마다 시점이 다릅니다 */
+  windowCount: number
+}
+
+export function departureTracker() {
+  // 사용자명 → 마지막으로 팔로워였던 스냅샷의 정보
+  const lastSeen = new Map<string, { user: IgUser; at: number; index: number }>()
+  const times: number[] = []
+
+  /** 스냅샷을 오래된 것부터 하나씩 넣습니다. */
+  function add(snapshot: Snapshot) {
+    const index = times.length
+    times.push(snapshot.createdAt)
+    for (const user of snapshot.followers) {
+      // 나중 스냅샷의 정보로 덮어씁니다 — 표시 이름이 최신으로 유지됩니다.
+      lastSeen.set(user.username, { user, at: snapshot.createdAt, index })
+    }
+  }
+
+  function result(): DepartureTrace {
+    const latest = times.length - 1
+    const departures: Departure[] = []
+    for (const entry of lastSeen.values()) {
+      // 마지막 스냅샷에도 있으면 지금도 팔로워입니다.
+      // (떠났다가 다시 돌아온 사람도 여기서 걸러집니다.)
+      if (entry.index >= latest) continue
+      departures.push({
+        user: entry.user,
+        lastSeenAt: entry.at,
+        goneByAt: times[entry.index + 1],
+      })
+    }
+    departures.sort(
+      (a, b) => b.goneByAt - a.goneByAt || a.user.username.localeCompare(b.user.username),
+    )
+    return {
+      departures,
+      times,
+      windowCount: new Set(departures.map((d) => d.goneByAt)).size,
+    }
+  }
+
+  return { add, result }
+}

@@ -166,3 +166,24 @@ export async function renameSnapshot(id: string, label: string): Promise<void> {
   if (!snapshot) return
   await putSnapshot({ ...snapshot, label })
 }
+
+/**
+ * 저장된 스냅샷을 오래된 것부터 하나씩 넘겨줍니다.
+ * 한 번에 하나만 메모리에 올라가므로 팔로워가 많아도 안전합니다.
+ *
+ * @param from 이 시각보다 먼저 만들어진 스냅샷은 건너뜁니다.
+ * @param to 이 시각보다 나중에 만들어진 스냅샷은 건너뜁니다.
+ * @param preloaded 이미 읽어 둔 스냅샷 — 같은 것을 두 번 읽지 않습니다.
+ */
+export async function eachSnapshotOldestFirst(
+  fn: (snapshot: Snapshot) => void,
+  { from, to, preloaded }: { from?: number; to?: number; preloaded?: Snapshot } = {},
+): Promise<void> {
+  const metas = (await listSnapshots()).slice().reverse()
+  for (const meta of metas) {
+    if (from !== undefined && meta.createdAt < from) continue
+    if (to !== undefined && meta.createdAt > to) continue
+    const snapshot = preloaded?.id === meta.id ? preloaded : await getSnapshot(meta.id)
+    if (snapshot) fn(snapshot)
+  }
+}

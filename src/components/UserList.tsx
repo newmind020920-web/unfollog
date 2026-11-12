@@ -8,13 +8,18 @@ const PAGE = 100
 /** 링크로 열리는 페이지(아티팩트)에서는 파일 저장이 막혀 있어 CSV 버튼을 빼고 복사만 둡니다. */
 const CAN_DOWNLOAD = !import.meta.env.VITE_ARTIFACT
 
-type SortKey = 'recent' | 'oldest' | 'name'
+type SortKey = 'leftRecent' | 'leftOld' | 'recent' | 'oldest' | 'name'
 
 const SORT_LABELS: Record<SortKey, string> = {
+  leftRecent: '최근에 떠난 순',
+  leftOld: '오래전에 떠난 순',
   recent: '최근 팔로우순',
   oldest: '오래된 팔로우순',
   name: '아이디순',
 }
+
+/** 사용자명 → 언제 떠났는지. 주어지면 행에 시점이 붙고 정렬 기준이 늘어납니다. */
+export type Timeline = Map<string, { lastSeenAt: number; goneByAt: number; label: string }>
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -42,13 +47,15 @@ export function UserList({
   users,
   csvName,
   empty,
+  timeline,
 }: {
   users: IgUser[]
   csvName: string
   empty: ReactNode
+  timeline?: Timeline
 }) {
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<SortKey>('recent')
+  const [sort, setSort] = useState<SortKey>(timeline ? 'leftRecent' : 'recent')
   const [limit, setLimit] = useState(PAGE)
   const [copied, setCopied] = useState<'idle' | 'ok' | 'fail'>('idle')
   const copyTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -57,7 +64,15 @@ export function UserList({
     const q = query.trim().toLowerCase().replace(/^@/, '')
     const base = q ? users.filter((u) => u.username.includes(q)) : users
     const sorted = [...base]
-    if (sort === 'name') {
+    if (sort === 'leftRecent' || sort === 'leftOld') {
+      const dir = sort === 'leftRecent' ? -1 : 1
+      sorted.sort((a, b) => {
+        const av = timeline?.get(a.username)?.goneByAt
+        const bv = timeline?.get(b.username)?.goneByAt
+        if (av === undefined || bv === undefined) return a.username.localeCompare(b.username)
+        return (av - bv) * dir || a.username.localeCompare(b.username)
+      })
+    } else if (sort === 'name') {
       sorted.sort((a, b) => a.username.localeCompare(b.username))
     } else {
       const dir = sort === 'recent' ? -1 : 1
@@ -72,14 +87,14 @@ export function UserList({
       })
     }
     return sorted
-  }, [users, query, sort])
+  }, [users, query, sort, timeline])
 
   if (!users.length) {
     return <div className="px-6 py-16 text-center">{empty}</div>
   }
 
   const visible = filtered.slice(0, limit)
-  const hasAnyDate = users.some((u) => u.followedAt !== undefined)
+  const hasAnyDate = timeline !== undefined || users.some((u) => u.followedAt !== undefined)
 
   async function handleCopy() {
     const ok = await copyText(filtered.map((u) => u.display).join('\n'))
@@ -118,11 +133,13 @@ export function UserList({
             className="h-11 min-w-0 flex-1 rounded-xl bg-sunken px-3.5 text-[14px] font-medium text-fg-2 sm:flex-none"
             aria-label="정렬 기준"
           >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-              <option key={k} value={k}>
-                {SORT_LABELS[k]}
-              </option>
-            ))}
+            {(Object.keys(SORT_LABELS) as SortKey[])
+              .filter((k) => (k === 'leftRecent' || k === 'leftOld' ? timeline !== undefined : true))
+              .map((k) => (
+                <option key={k} value={k}>
+                  {SORT_LABELS[k]}
+                </option>
+              ))}
           </select>
         )}
 
@@ -142,7 +159,7 @@ export function UserList({
         {CAN_DOWNLOAD && (
           <Button
             size="md"
-            onClick={() => download(`${csvName}.csv`, toCsv(filtered))}
+            onClick={() => download(`${csvName}.csv`, toCsv(filtered, timeline))}
             title="지금 보이는 목록을 CSV 파일로 저장"
           >
             <Icon name="download" size={17} />
@@ -163,7 +180,7 @@ export function UserList({
                 key={user.username}
                 className="relative after:absolute after:right-0 after:bottom-0 after:left-[70px] after:h-px after:bg-line last:after:hidden"
               >
-                <Row user={user} />
+                <Row user={user} note={timeline?.get(user.username)?.label} />
               </li>
             ))}
           </ul>
@@ -191,7 +208,7 @@ export function UserList({
   )
 }
 
-function Row({ user }: { user: IgUser }) {
+function Row({ user, note }: { user: IgUser; note?: string }) {
   const body = (
     <>
       <span
@@ -202,10 +219,14 @@ function Row({ user }: { user: IgUser }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] leading-[1.4] font-semibold">@{user.display}</span>
-        {user.followedAt && (
-          <span className="tnum mt-0.5 block text-[13px] text-faint">
-            {new Date(user.followedAt * 1000).toLocaleDateString('ko-KR')} 팔로우
-          </span>
+        {note ? (
+          <span className="tnum mt-0.5 block truncate text-[13px] text-faint">{note}</span>
+        ) : (
+          user.followedAt && (
+            <span className="tnum mt-0.5 block text-[13px] text-faint">
+              {new Date(user.followedAt * 1000).toLocaleDateString('ko-KR')} 팔로우
+            </span>
+          )
         )}
       </span>
     </>

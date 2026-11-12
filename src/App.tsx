@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { IgUser, Snapshot, SnapshotMeta } from './types'
-import { analyze, compare, mayContainRenames, type Analysis, type Comparison } from './lib/analyze'
+import {
+  analyze,
+  compare,
+  departureTracker,
+  mayContainRenames,
+  type Analysis,
+  type Comparison,
+  type Departure,
+  type DepartureTrace,
+} from './lib/analyze'
 import {
   clearAll,
   deleteSnapshot,
+  eachSnapshotOldestFirst,
   getSnapshot,
   isPersistent,
   listSnapshots,
@@ -15,7 +25,7 @@ import { buildSampleSnapshots } from './lib/sample'
 import { Dropzone } from './components/Dropzone'
 import { Guide } from './components/Guide'
 import { SnapshotPanel } from './components/SnapshotPanel'
-import { UserList } from './components/UserList'
+import { UserList, type Timeline } from './components/UserList'
 import {
   Button,
   Card,
@@ -24,8 +34,10 @@ import {
   Pill,
   Spinner,
   cx,
+  formatAgo,
   formatDay,
   formatRange,
+  formatSpan,
   type IconName,
 } from './components/ui'
 
@@ -56,6 +68,8 @@ type ListDef = {
   tone: Tone
   /** null = 비교할 스냅샷이 아직 없음 */
   users: IgUser[] | null
+  /** 떠난 시점 — 구간이 둘 이상일 때만 채웁니다 */
+  timeline?: Timeline
   csv: string
   emptyTitle: string
   emptyBody: string
@@ -125,10 +139,33 @@ function newSnapshotLabel(createdAt: number, existing: SnapshotMeta[]) {
 
 const num = (n: number) => n.toLocaleString('ko-KR')
 
+/**
+ * "3일 전쯤 · 11월 5~12일 사이" — 떠난 시점은 두 스냅샷 사이 구간으로만 알 수 있으므로,
+ * 구간의 가운데를 어림값으로 쓰고 구간 자체를 같이 보여줍니다.
+ */
+function departureLabel(d: Departure, now: number) {
+  const span = formatSpan(d.lastSeenAt, d.goneByAt)
+  const ago = formatAgo((d.lastSeenAt + d.goneByAt) / 2, now)
+  const approx = ago === '오늘' || ago === '어제' ? ago : `${ago}쯤`
+  return span.sameDay ? `${approx} · ${span.text}` : `${approx} · ${span.text} 사이`
+}
+
+function buildTimeline(trace: DepartureTrace, now: number): Timeline | undefined {
+  // 구간이 하나뿐이면 모든 행에 같은 문구가 붙어 의미가 없습니다.
+  if (trace.windowCount < 2) return undefined
+  return new Map(
+    trace.departures.map((d) => [
+      d.user.username,
+      { lastSeenAt: d.lastSeenAt, goneByAt: d.goneByAt, label: departureLabel(d, now) },
+    ]),
+  )
+}
+
 export default function App() {
   const [metas, setMetas] = useState<SnapshotMeta[]>([])
   const [current, setCurrent] = useState<Snapshot | null>(null)
   const [baseline, setBaseline] = useState<Snapshot | null>(null)
+  const [trace, setTrace] = useState<DepartureTrace | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
@@ -141,25 +178,41 @@ export default function App() {
     if (view !== 'home') setNotice((n) => (n && n.tone !== 'red' ? null : n))
   }, [view])
 
-  /** 지정한 스냅샷을 보고, 그보다 오래된 것 중 가장 최근을 비교 기준으로 잡습니다. */
+  /**
+   * 지정한 스냅샷을 보고, 비교 시작 지점을 정합니다.
+   * 기본값은 가장 오래된 스냅샷 — 저장해 둔 기록 전체를 보여주고,
+   * 중간 스냅샷이 있으면 사람마다 떠난 시점을 좁힐 수 있습니다.
+   */
   const selectPair = useCallback(
     async (list: SnapshotMeta[], currentId: string | null, baselineId?: string | null) => {
       if (!currentId) {
         setCurrent(null)
         setBaseline(null)
+        setTrace(null)
         return
       }
       const curr = await getSnapshot(currentId)
       setCurrent(curr ?? null)
       if (!curr) {
         setBaseline(null)
+        setTrace(null)
         return
       }
+
+      const older = list.filter((m) => m.createdAt < curr.createdAt && m.id !== curr.id)
       const resolvedBaselineId =
-        baselineId !== undefined
-          ? baselineId
-          : (list.find((m) => m.createdAt < curr.createdAt && m.id !== curr.id)?.id ?? null)
-      setBaseline(resolvedBaselineId ? ((await getSnapshot(resolvedBaselineId)) ?? null) : null)
+        baselineId !== undefined ? baselineId : (older[older.length - 1]?.id ?? null)
+      const base = resolvedBaselineId ? ((await getSnapshot(resolvedBaselineId)) ?? null) : null
+      setBaseline(base)
+
+      // 시작 지점부터 지금 보는 스냅샷까지 훑어 떠난 시점을 좁힙니다.
+      const tracker = departureTracker()
+      await eachSnapshotOldestFirst((snap) => tracker.add(snap), {
+        from: base?.createdAt,
+        to: curr.createdAt,
+        preloaded: curr,
+      })
+      setTrace(tracker.result())
     },
     [],
   )
@@ -263,10 +316,9 @@ export default function App() {
     setNotice(null)
     setWarnings([])
     try {
-      const [previous, latest] = buildSampleSnapshots(Date.now())
-      await putSnapshot(previous)
-      await putSnapshot(latest)
-      await refresh(latest.id)
+      const samples = buildSampleSnapshots(Date.now())
+      for (const snapshot of samples) await putSnapshot(snapshot)
+      await refresh(samples[samples.length - 1].id)
       go('home')
     } catch (err) {
       setNotice({
@@ -313,6 +365,7 @@ export default function App() {
             baseline={baseline}
             analysis={analysis}
             comparison={comparison}
+            trace={trace}
             metas={metas}
             persistent={persistent}
             onRemoveSamples={async () => {
@@ -557,6 +610,7 @@ type WorkspaceProps = {
   baseline: Snapshot | null
   analysis: Analysis
   comparison: Comparison | null
+  trace: DepartureTrace | null
   metas: SnapshotMeta[]
   persistent: boolean
   onRemoveSamples: () => void
@@ -572,19 +626,26 @@ function buildLists(
   baseline: Snapshot | null,
   analysis: Analysis,
   comparison: Comparison | null,
+  trace: DepartureTrace | null,
+  now: number,
 ): Record<ListView, ListDef> {
   const since = baseline ? `‘${baseline.label}’` : '지난번'
+  const timeline = trace ? buildTimeline(trace, now) : undefined
+  const multiStep = timeline !== undefined
   return {
     unfollowers: {
       view: 'unfollowers',
       label: '나를 언팔한 사람',
-      description: `${since} 스냅샷에서는 나를 팔로우했지만 지금은 팔로우하지 않는 계정이에요.`,
+      description: multiStep
+        ? `${since} 이후 저장된 스냅샷을 모두 훑어서 찾았어요. 떠난 시점은 파일을 올린 두 시점 사이 구간으로만 알 수 있어서 어림값이에요.`
+        : `${since} 스냅샷에서는 나를 팔로우했지만 지금은 팔로우하지 않는 계정이에요.`,
       icon: 'userMinus',
       tone: 'red',
-      users: comparison?.unfollowers ?? null,
+      users: trace && trace.times.length >= 2 ? trace.departures.map((d) => d.user) : null,
+      timeline,
       csv: 'instafloww-나를-언팔한-사람',
       emptyTitle: '나를 언팔한 사람이 없어요',
-      emptyBody: '두 스냅샷 사이에 떠난 팔로워가 한 명도 없어요.',
+      emptyBody: '저장된 스냅샷 사이에 떠난 팔로워가 한 명도 없어요.',
     },
     'new-followers': {
       view: 'new-followers',
@@ -658,16 +719,17 @@ function buildLists(
 function Workspace(props: WorkspaceProps) {
   const { view, back, current, baseline, analysis, comparison, metas } = props
   const lists = useMemo(
-    () => buildLists(current, baseline, analysis, comparison),
-    [current, baseline, analysis, comparison],
+    () => buildLists(current, baseline, analysis, comparison, props.trace, Date.now()),
+    [current, baseline, analysis, comparison, props.trace],
   )
 
   if (view === 'snapshots') {
     return (
       <Detail title="스냅샷 관리" onBack={back}>
         <p className="ko px-4 pb-4 text-[15px] leading-[1.65] text-muted sm:px-5">
-          파일을 올릴 때마다 그때의 목록이 스냅샷으로 저장돼요. 어떤 스냅샷을 보고, 어떤 것과
-          비교할지 고를 수 있어요.
+          파일을 올릴 때마다 그때의 목록이 스냅샷으로 저장돼요. 기본은 가장 오래된 것부터 지금까지
+          전체를 비교해요. <b className="font-semibold text-fg-2">여기서부터 비교</b>를 고르면 그
+          시점 이후만 볼 수 있어요.
         </p>
         <SnapshotPanel
           metas={metas}
@@ -702,6 +764,7 @@ function Workspace(props: WorkspaceProps) {
           <UserList
             key={def.view}
             users={def.users}
+            timeline={def.timeline}
             csvName={def.csv}
             empty={<Empty icon="check" tone="green" title={def.emptyTitle} body={def.emptyBody} />}
           />
@@ -721,13 +784,17 @@ function Home({
   baseline,
   analysis,
   comparison,
+  trace,
   metas,
   persistent,
   onRemoveSamples,
   lists,
 }: WorkspaceProps & { lists: Record<ListView, ListDef> }) {
-  const unfollowed = comparison?.unfollowers.length ?? null
+  const unfollowed = lists.unfollowers.users?.length ?? null
   const oneWay = analysis.notFollowingBack.length
+  // 스냅샷이 셋 이상이면 "지난번"이 아니라 실제 시작 날짜를 말해 줍니다.
+  const since =
+    trace && trace.times.length > 2 ? `${formatDay(trace.times[0])} 이후` : '지난번 이후'
 
   return (
     <div className="pt-4">
@@ -761,13 +828,13 @@ function Home({
             )
           ) : unfollowed > 0 ? (
             <>
-              지난번 이후
+              {since}
               <br />
               <span className="text-red">{num(unfollowed)}명</span>이 나를 언팔했어요
             </>
           ) : (
             <>
-              지난번 이후
+              {since}
               <br />
               나를 언팔한 사람이 없어요
             </>
@@ -786,7 +853,11 @@ function Home({
       </div>
 
       <MenuGroup title="지난번과 달라진 것">
-        <MenuRow def={lists.unfollowers} onOpen={go} />
+        <MenuRow
+          def={lists.unfollowers}
+          onOpen={go}
+          hint={lists.unfollowers.timeline ? '누가 언제 떠났는지까지 보여줘요' : undefined}
+        />
         <MenuRow def={lists['new-followers']} onOpen={go} last />
       </MenuGroup>
 

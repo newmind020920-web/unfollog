@@ -4,6 +4,8 @@ import type { IgUser, Snapshot } from '../types'
  * 파일 없이 화면을 둘러볼 수 있는 체험용 데이터.
  * 실제 계정과 헷갈리지 않도록 아이디는 모두 demo_ 로 시작하고,
  * 프로필 링크는 만들지 않습니다.
+ *
+ * 떠난 시점 추적을 체험에서도 볼 수 있도록 스냅샷을 셋 만듭니다.
  */
 
 const WORDS = [
@@ -13,6 +15,7 @@ const WORDS = [
 const TAILS = ['', '_', '.log', '_daily', '.film', '_02', '_cafe', '.jpg', '__', '_room']
 
 const DAY = 24 * 60 * 60
+const DAY_MS = DAY * 1000
 
 function makeUsers(count: number, offset: number, nowSec: number): IgUser[] {
   return Array.from({ length: count }, (_, i) => {
@@ -30,38 +33,56 @@ function makeUsers(count: number, offset: number, nowSec: number): IgUser[] {
   })
 }
 
-export function buildSampleSnapshots(now: number): [Snapshot, Snapshot] {
+/** 오래된 것부터 세 개 — 2주 전, 지난주, 오늘 */
+export function buildSampleSnapshots(now: number): [Snapshot, Snapshot, Snapshot] {
   const nowSec = Math.floor(now / 1000)
+
   const mutual = makeUsers(190, 0, nowSec) // 서로 팔로우
   const fans = makeUsers(110, 190, nowSec) // 나를 팔로우하지만 내가 안 함
   const oneWay = makeUsers(60, 300, nowSec) // 내가 팔로우하지만 상대가 안 함
-  const newcomers = makeUsers(12, 360, nowSec).map((u, i) => ({
+
+  // 중간에 들어온 사람들은 팔로우 날짜도 그 무렵으로 맞춥니다.
+  const joinedWeek1 = makeUsers(5, 360, nowSec).map((u, i) => ({
+    ...u,
+    followedAt: nowSec - (10 + i) * DAY,
+  }))
+  const joinedWeek2 = makeUsers(12, 365, nowSec).map((u, i) => ({
     ...u,
     followedAt: nowSec - (i % 6) * DAY - i * 1800,
   }))
-  const newFollowing = makeUsers(3, 372, nowSec).map((u, i) => ({
+  const followedLater = makeUsers(3, 377, nowSec).map((u, i) => ({
     ...u,
     followedAt: nowSec - (i + 1) * DAY,
   }))
 
-  const previous: Snapshot = {
-    id: 'sample-previous',
-    createdAt: now - 7 * DAY * 1000,
-    label: '샘플 · 지난주',
+  const twoWeeksAgo: Snapshot = {
+    id: 'sample-0',
+    createdAt: now - 17 * DAY_MS,
+    label: '샘플 · 2주 전',
     followers: [...mutual, ...fans],
     following: [...mutual, ...oneWay],
     sample: true,
   }
 
-  // 일주일 사이: 맞팔 4명 + 팬 3명이 언팔, 12명이 새로 팔로우, 내가 3명을 새로 팔로우
-  const current: Snapshot = {
-    id: 'sample-current',
-    createdAt: now,
-    label: '샘플 · 오늘',
-    followers: [...mutual.slice(4), ...fans.slice(3), ...newcomers],
-    following: [...mutual, ...oneWay, ...newFollowing],
+  // 1구간: 맞팔 2명 + 팬 1명이 떠나고, 5명이 새로 들어옴
+  const lastWeek: Snapshot = {
+    id: 'sample-1',
+    createdAt: now - 7 * DAY_MS,
+    label: '샘플 · 지난주',
+    followers: [...mutual.slice(2), ...fans.slice(1), ...joinedWeek1],
+    following: [...mutual, ...oneWay],
     sample: true,
   }
 
-  return [previous, current]
+  // 2구간: 맞팔 2명 + 팬 2명이 더 떠나고, 12명이 새로 들어옴
+  const today: Snapshot = {
+    id: 'sample-2',
+    createdAt: now,
+    label: '샘플 · 오늘',
+    followers: [...mutual.slice(4), ...fans.slice(3), ...joinedWeek1, ...joinedWeek2],
+    following: [...mutual, ...oneWay, ...followedLater],
+    sample: true,
+  }
+
+  return [twoWeeksAgo, lastWeek, today]
 }

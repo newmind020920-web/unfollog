@@ -1,5 +1,5 @@
 import { parseFiles } from '../src/lib/parse'
-import { analyze, compare } from '../src/lib/analyze'
+import { analyze, compare, departureTracker } from '../src/lib/analyze'
 import type { Snapshot } from '../src/types'
 import { buildZip, followersJson, followingJson, pendingJson } from './fixture'
 
@@ -127,6 +127,75 @@ async function main() {
     eq('새 팔로워', c.newFollowers.map((u) => u.username), ['frank'])
     eq('내가 언팔한 사람', c.removedFollowing.map((u) => u.username), ['erin'])
     eq('내가 새로 팔로우', c.addedFollowing.map((u) => u.username), ['grace'])
+  }
+
+  console.log('\n떠난 시점 추적 (스냅샷 3개 이상)')
+  {
+    const snap = (id: string, at: number, names: string[]): Snapshot => ({
+      id,
+      createdAt: at,
+      label: id,
+      followers: names.map((n) => ({ username: n, display: n, href: '' })),
+      following: [],
+    })
+
+    const DAY = 86_400_000
+    const t1 = 1_000 * DAY
+    const t2 = t1 + 7 * DAY
+    const t3 = t2 + 7 * DAY
+
+    const tracker = departureTracker()
+    //            alice bob carol dave erin frank
+    // t1 (2주전)   O     O    O     O    -     -
+    // t2 (1주전)   O     -    O     O    O     -     → bob 이 1구간에서 이탈
+    // t3 (오늘)    O     -    -     O    O     O     → carol 이 2구간에서 이탈, dave 는 계속
+    tracker.add(snap('t1', t1, ['alice', 'bob', 'carol', 'dave']))
+    tracker.add(snap('t2', t2, ['alice', 'carol', 'dave', 'erin']))
+    tracker.add(snap('t3', t3, ['alice', 'dave', 'erin', 'frank']))
+    const trace = tracker.result()
+
+    eq('떠난 사람 2명, 최근 순', trace.departures.map((d) => d.user.username), ['carol', 'bob'])
+    eq('carol 은 t2~t3 구간', [trace.departures[0].lastSeenAt, trace.departures[0].goneByAt], [t2, t3])
+    eq('bob 은 t1~t2 구간', [trace.departures[1].lastSeenAt, trace.departures[1].goneByAt], [t1, t2])
+    eq('서로 다른 이탈 구간 2개', trace.windowCount, 2)
+    eq('스냅샷 시각 3개', trace.times, [t1, t2, t3])
+    check('계속 팔로워인 사람은 제외', !trace.departures.some((d) => ['alice', 'dave', 'erin', 'frank'].includes(d.user.username)))
+  }
+
+  console.log('\n떠났다가 돌아온 사람')
+  {
+    const snap = (at: number, names: string[]): Snapshot => ({
+      id: String(at), createdAt: at, label: String(at),
+      followers: names.map((n) => ({ username: n, display: n, href: '' })),
+      following: [],
+    })
+    const tracker = departureTracker()
+    tracker.add(snap(1, ['alice', 'bob']))
+    tracker.add(snap(2, ['alice']))          // bob 이탈
+    tracker.add(snap(3, ['alice', 'bob']))   // bob 복귀
+    eq('돌아왔으면 떠난 사람이 아님', tracker.result().departures, [])
+
+    const one = departureTracker()
+    one.add(snap(1, ['alice', 'bob']))
+    eq('스냅샷이 하나면 알 수 없음', one.result().departures, [])
+    eq('구간 0개', one.result().windowCount, 0)
+  }
+
+  console.log('\n표시 이름은 마지막으로 보인 스냅샷 기준')
+  {
+    const tracker = departureTracker()
+    tracker.add({
+      id: 'a', createdAt: 1, label: 'a', following: [],
+      followers: [{ username: 'zoe', display: 'Zoe_OLD', href: 'https://www.instagram.com/Zoe_OLD' }],
+    })
+    tracker.add({
+      id: 'b', createdAt: 2, label: 'b', following: [],
+      followers: [{ username: 'zoe', display: 'Zoe_NEW', href: 'https://www.instagram.com/Zoe_NEW' }],
+    })
+    tracker.add({ id: 'c', createdAt: 3, label: 'c', following: [], followers: [] })
+    const d = tracker.result().departures[0]
+    eq('최신 표시 이름 사용', d.user.display, 'Zoe_NEW')
+    eq('구간은 b~c', [d.lastSeenAt, d.goneByAt], [2, 3])
   }
 
   console.log('\n대소문자/비프로필 링크 처리')

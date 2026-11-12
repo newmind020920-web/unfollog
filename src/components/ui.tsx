@@ -219,3 +219,27 @@ export function formatRange(from: number, to: number) {
     `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
   return `${formatDay(from)} ${hm(a)} → ${hm(b)}`
 }
+
+/** "3일 전", "2주 전" 처럼 지금으로부터 얼마나 지났는지 */
+export function formatAgo(ms: number, now = Date.now()) {
+  const elapsed = Math.max(0, now - ms)
+  const day = 86_400_000
+  if (elapsed < day) return '오늘'
+  const days = Math.floor(elapsed / day)
+  if (days === 1) return '어제'
+  if (days < 7) return `${days}일 전`
+  if (days < 28) return `${Math.floor(days / 7)}주 전`
+  if (days < 365) return `${Math.max(1, Math.round(days / 30))}개월 전`
+  return `${Math.floor(days / 365)}년 전`
+}
+
+/** 두 시점을 "11월 5~12일" 처럼 짧게. 같은 날이면 날짜 하나만 돌려줍니다. */
+export function formatSpan(from: number, to: number): { text: string; sameDay: boolean } {
+  const a = new Date(from)
+  const b = new Date(to)
+  if (a.toDateString() === b.toDateString()) return { text: formatDay(to), sameDay: true }
+  if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()) {
+    return { text: `${a.getMonth() + 1}월 ${a.getDate()}~${b.getDate()}일`, sameDay: false }
+  }
+  return { text: `${formatDay(from)}~${formatDay(to)}`, sameDay: false }
+}
