@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useRef, useState, type DragEvent, type RefObject } from 'react'
 import { Button, Icon, Spinner, cx } from './ui'
 
 export function Dropzone({
@@ -21,14 +21,12 @@ export function Dropzone({
     if (files.length) onFiles(files)
   }
 
-  const label = busy ? '분석 중…' : '파일 선택'
-
   if (compact) {
     return (
       <>
         <Button variant="primary" size="sm" onClick={() => inputRef.current?.click()} disabled={busy}>
-          {busy ? <Spinner /> : <Icon name="upload" size={15} />}
-          {busy ? '분석 중…' : '새 스냅샷 추가'}
+          {busy ? <Spinner className="h-4 w-4" /> : <Icon name="upload" size={16} />}
+          {busy ? '분석 중' : '파일 올리기'}
         </Button>
         <FileInput inputRef={inputRef} onFiles={onFiles} />
       </>
@@ -44,41 +42,39 @@ export function Dropzone({
       onDragLeave={() => setHovering(false)}
       onDrop={handleDrop}
       className={cx(
-        'relative rounded-2xl border-2 border-dashed p-8 text-center transition-colors sm:p-12',
-        hovering ? 'border-brand bg-brand-soft/40' : 'border-line-strong bg-surface/60',
+        'rounded-[20px] px-6 py-10 text-center transition-colors sm:py-14',
+        hovering ? 'bg-blue-weak' : 'bg-card shadow-card',
         busy && 'opacity-70',
       )}
     >
       <div
         className={cx(
-          'mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border',
-          hovering ? 'border-brand/50 bg-brand/15 text-brand' : 'border-line bg-surface-2 text-muted',
+          'mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] transition-colors',
+          hovering ? 'bg-blue text-white' : 'bg-blue-weak text-blue',
         )}
       >
-        {busy ? <Spinner className="h-5 w-5" /> : <Icon name="upload" size={22} />}
+        {busy ? <Spinner className="h-6 w-6" /> : <Icon name="upload" size={26} />}
       </div>
 
-      <p className="text-base font-semibold">
-        인스타그램 내보내기 파일을 여기에 끌어다 놓으세요
+      <p className="display text-[20px] font-bold sm:text-[22px]">
+        {hovering ? '여기에 놓아주세요' : '파일을 여기에 끌어다 놓으세요'}
       </p>
-      <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-muted">
-        내려받은 <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[12px]">.zip</code>{' '}
-        을 그대로 올리거나, 압축을 푼 뒤{' '}
-        <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[12px]">followers_1.json</code>
-        {' '}과{' '}
-        <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[12px]">following.json</code>
-        {' '}을 함께 선택해도 됩니다.
+      <p className="ko mx-auto mt-2.5 max-w-sm text-[15px] leading-[1.6] text-muted">
+        인스타그램에서 받은 ZIP을 그대로 올리면 돼요. 압축을 풀었다면{' '}
+        <b className="font-semibold text-fg-2">followers</b> 와{' '}
+        <b className="font-semibold text-fg-2">following</b> 파일을 함께 선택해 주세요.
       </p>
 
-      <div className="mt-5">
-        <Button variant="primary" onClick={() => inputRef.current?.click()} disabled={busy}>
-          {busy ? <Spinner /> : <Icon name="upload" size={16} />}
-          {label}
+      <div className="mx-auto mt-7 max-w-[280px]">
+        <Button variant="primary" size="lg" full onClick={() => inputRef.current?.click()} disabled={busy}>
+          {busy ? <Spinner className="h-5 w-5" /> : null}
+          {busy ? '분석 중' : '파일 선택하기'}
         </Button>
       </div>
 
-      <p className="mt-5 text-[12px] text-faint">
-        파일은 네트워크로 전송되지 않습니다. 브라우저 안에서만 읽습니다.
+      <p className="mt-5 flex items-center justify-center gap-1.5 text-[13px] text-faint">
+        <Icon name="lock" size={14} />
+        파일은 네트워크로 전송되지 않아요
       </p>
 
       <FileInput inputRef={inputRef} onFiles={onFiles} />
@@ -90,7 +86,7 @@ function FileInput({
   inputRef,
   onFiles,
 }: {
-  inputRef: React.RefObject<HTMLInputElement>
+  inputRef: RefObject<HTMLInputElement>
   onFiles: (files: File[]) => void
 }) {
   return (

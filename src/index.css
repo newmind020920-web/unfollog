@@ -1,39 +1,84 @@
-@import "tailwindcss";
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+@import 'tailwindcss';
 
+/*
+ * 토스 그레이 스케일 + 토스 블루 기반 라이트 테마.
+ * 모든 색을 의미 이름으로 한 번만 정의해서, 아래 다크 모드 블록에서
+ * 값만 바꿔 끼우면 전체가 따라옵니다.
+ */
 @theme {
-  --color-ink: #08080a;
-  --color-surface: #101014;
-  --color-surface-2: #17171d;
-  --color-surface-3: #1f1f27;
-  --color-line: #27272f;
-  --color-line-strong: #383842;
-  --color-fg: #f4f4f5;
-  --color-muted: #90909d;
-  --color-faint: #63636e;
-  --color-brand: #a855f7;
-  --color-brand-soft: #2a1740;
-  --color-danger: #fb7185;
-  --color-danger-soft: #3a1620;
-  --color-success: #34d399;
-  --color-success-soft: #0f2e24;
-  --color-info: #60a5fa;
-  --color-info-soft: #13233d;
+  --color-bg: #f2f4f6;
+  --color-card: #ffffff;
+  --color-sunken: #f9fafb;
+  --color-line: #e8ebed;
+  --color-line-strong: #d1d6db;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo",
-    "Pretendard Variable", Pretendard, "Malgun Gothic", "Noto Sans KR", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --color-fg: #191f28;
+  --color-fg-2: #4e5968;
+  --color-muted: #6b7684;
+  --color-faint: #8b95a1;
+
+  --color-blue: #3182f6;
+  --color-blue-hover: #1b64da;
+  --color-blue-weak: #e8f3ff;
+  --color-red: #f04452;
+  --color-red-weak: #fdf0f1;
+  --color-green: #15c47e;
+  --color-green-weak: #e9f9f2;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03), 0 6px 20px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 2px 6px rgba(0, 0, 0, 0.05), 0 12px 32px rgba(0, 0, 0, 0.08);
+
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/*
+ * 다크 모드는 토큰 값만 바꿔 끼웁니다.
+ * Tailwind v4 의 @theme 은 미디어 쿼리 안에 둘 수 없어서(:root 로 끌어올려짐)
+ * 평범한 CSS 커스텀 속성 오버라이드로 씁니다.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #17171c;
+    --color-card: #202027;
+    --color-sunken: #26262e;
+    --color-line: #32323c;
+    --color-line-strong: #43434f;
+
+    --color-fg: #f2f4f6;
+    --color-fg-2: #c7ccd3;
+    --color-muted: #9ba3ad;
+    --color-faint: #7c848e;
+
+    --color-blue: #4593fc;
+    --color-blue-hover: #6aa9fd;
+    --color-blue-weak: #16243a;
+    --color-red: #ff6b78;
+    --color-red-weak: #33191d;
+    --color-green: #2dd68f;
+    --color-green-weak: #112a21;
+
+    /* 어두운 배경에서는 그림자가 안 보이므로 얇은 테두리로 대신합니다. */
+    --shadow-card: 0 0 0 1px #2b2b34;
+    --shadow-float: 0 0 0 1px #35353f, 0 12px 32px rgba(0, 0, 0, 0.4);
+  }
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light dark;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background-color: var(--color-ink);
+  background-color: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
+  /* 한글은 자간을 살짝 좁혀야 Pretendard 가 제 모양으로 보입니다. */
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* 숫자가 바뀔 때 폭이 흔들리지 않도록 */
@@ -41,25 +86,32 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* 큰 제목은 더 좁은 자간이 어울립니다. */
+.display {
+  letter-spacing: -0.035em;
+  word-break: keep-all;
+}
+
+/* 한글 본문은 단어 중간에서 줄바꿈되지 않게 */
+.ko {
+  word-break: keep-all;
+}
+
 ::selection {
-  background: var(--color-brand);
+  background: var(--color-blue);
   color: #fff;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid var(--color-blue);
   outline-offset: 2px;
+  border-radius: 8px;
 }
 
-/* 배경 글로우 */
-.aurora::before {
-  content: "";
-  position: fixed;
-  inset: -20% 0 auto 0;
-  height: 60vh;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(45% 50% at 20% 0%, rgba(168, 85, 247, 0.16), transparent 70%),
-    radial-gradient(40% 45% at 80% 10%, rgba(96, 165, 250, 0.12), transparent 70%);
+/* 탭 줄의 스크롤바 숨기기 */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

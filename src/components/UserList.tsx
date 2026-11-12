@@ -3,21 +3,21 @@ import type { IgUser } from '../types'
 import { download, toCsv } from '../lib/export'
 import { Button, Icon, cx } from './ui'
 
-const PAGE = 150
+const PAGE = 100
 
 type SortKey = 'recent' | 'oldest' | 'name'
 
 const SORT_LABELS: Record<SortKey, string> = {
   recent: '최근 팔로우순',
   oldest: '오래된 팔로우순',
-  name: '이름순',
+  name: '아이디순',
 }
 
 export function UserList({
   users,
   csvName,
   empty,
-  /** followedAt 이 의미가 없는 목록(내 팔로잉 기준 등)에서는 날짜 정렬을 숨깁니다 */
+  /** followedAt 이 의미 없는 목록에서는 날짜 정렬을 숨깁니다 */
   showFollowedAt = true,
 }: {
   users: IgUser[]
@@ -51,7 +51,7 @@ export function UserList({
   }, [users, query, sort])
 
   if (!users.length) {
-    return <div className="px-5 py-14 text-center">{empty}</div>
+    return <div className="px-6 py-16 text-center">{empty}</div>
   }
 
   const visible = filtered.slice(0, limit)
@@ -59,12 +59,12 @@ export function UserList({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-4 sm:px-5">
         <div className="relative order-first w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">
           <Icon
             name="search"
-            size={15}
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint"
+            size={18}
+            className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-faint"
           />
           <input
             value={query}
@@ -73,7 +73,7 @@ export function UserList({
               setLimit(PAGE)
             }}
             placeholder="아이디 검색"
-            className="w-full rounded-xl border border-line bg-surface-2 py-2 pr-3 pl-9 text-sm text-fg placeholder:text-faint"
+            className="h-11 w-full rounded-xl bg-sunken pr-3 pl-11 text-[15px] text-fg placeholder:text-faint"
           />
         </div>
 
@@ -81,7 +81,7 @@ export function UserList({
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-[13px] text-muted"
+            className="h-11 rounded-xl bg-sunken px-3.5 text-[14px] font-medium text-fg-2"
             aria-label="정렬 기준"
           >
             {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
@@ -92,55 +92,48 @@ export function UserList({
           </select>
         )}
 
-        <Button
-          size="sm"
-          onClick={() => download(`${csvName}.csv`, toCsv(filtered))}
-          title="현재 목록을 CSV 로 저장"
-        >
-          <Icon name="download" size={15} />
+        <Button size="md" onClick={() => download(`${csvName}.csv`, toCsv(filtered))} title="지금 보이는 목록을 CSV 로 저장">
+          <Icon name="download" size={17} />
           CSV
         </Button>
       </div>
 
       {filtered.length === 0 ? (
-        <p className="px-5 py-12 text-center text-sm text-muted">
-          “{query}” 와 일치하는 아이디가 없습니다.
+        <p className="ko px-6 py-14 text-center text-[15px] text-muted">
+          ‘{query}’와 일치하는 아이디가 없어요.
         </p>
       ) : (
         <>
-          <ul className="divide-y divide-line/70">
-            {visible.map((user, i) => (
-              <li key={user.username}>
+          <ul>
+            {visible.map((user) => (
+              <li
+                key={user.username}
+                className="relative after:absolute after:right-0 after:bottom-0 after:left-[70px] after:h-px after:bg-line last:after:hidden"
+              >
                 <a
                   href={user.href}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2"
+                  className="flex items-center gap-3.5 px-4 py-3 transition-colors hover:bg-sunken sm:px-5"
                 >
-                  <span className="tnum w-8 shrink-0 text-right text-[12px] text-faint">
-                    {i + 1}
-                  </span>
                   <span
                     aria-hidden
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[13px] font-semibold text-muted uppercase"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sunken text-[16px] font-bold text-faint uppercase"
                   >
                     {user.display.slice(0, 1)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-fg">
+                    <span className="block truncate text-[16px] leading-[1.4] font-semibold">
                       @{user.display}
                     </span>
                     {showFollowedAt && user.followedAt && (
-                      <span className="block text-[12px] text-faint">
+                      <span className="tnum mt-0.5 block text-[13px] text-faint">
                         {new Date(user.followedAt * 1000).toLocaleDateString('ko-KR')} 팔로우
                       </span>
                     )}
                   </span>
-                  <Icon
-                    name="external"
-                    size={15}
-                    className="text-faint opacity-0 transition-opacity group-hover:opacity-100"
-                  />
+                  {/* 터치 기기에는 hover 가 없으므로 항상 보이게 둡니다. */}
+                  <Icon name="external" size={17} className="text-line-strong" />
                 </a>
               </li>
             ))}
@@ -148,18 +141,18 @@ export function UserList({
 
           <div
             className={cx(
-              'flex items-center justify-between gap-3 px-4 py-3 text-[12px] text-faint',
+              'flex items-center justify-between gap-3 px-5 py-4',
               filtered.length > limit && 'border-t border-line',
             )}
           >
-            <span className="tnum">
+            <span className="tnum text-[13px] text-faint">
               {Math.min(limit, filtered.length).toLocaleString('ko-KR')} /{' '}
               {filtered.length.toLocaleString('ko-KR')}명
             </span>
             {filtered.length > limit && (
               <Button size="sm" variant="ghost" onClick={() => setLimit((n) => n + PAGE * 4)}>
                 더 보기
-                <Icon name="chevron" size={14} className="rotate-90" />
+                <Icon name="chevron" size={15} className="rotate-90" />
               </Button>
             )}
           </div>

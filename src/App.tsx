@@ -14,18 +14,14 @@ import { Dropzone } from './components/Dropzone'
 import { Guide } from './components/Guide'
 import { SnapshotPanel } from './components/SnapshotPanel'
 import { UserList } from './components/UserList'
-import { Card, Icon, Pill, Spinner, cx, formatDateShort } from './components/ui'
+import { Card, Icon, InfoBox, Pill, Spinner, cx, formatDay, formatRange } from './components/ui'
 
 type TabKey = 'unfollowers' | 'crush' | 'fans' | 'newFollowers' | 'mutual' | 'snapshots'
 
-type Notice = { tone: 'danger' | 'success' | 'info'; text: string } | null
+type Notice = { tone: 'red' | 'green' | 'neutral'; text: string } | null
 
 function newSnapshotLabel(createdAt: number, existing: SnapshotMeta[]) {
-  const base = new Date(createdAt).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const base = formatDay(createdAt)
   const sameDay = existing.filter((m) => m.label.startsWith(base)).length
   return sameDay ? `${base} (${sameDay + 1})` : base
 }
@@ -74,8 +70,8 @@ export default function App() {
       } catch (err) {
         if (!cancelled) {
           setNotice({
-            tone: 'danger',
-            text: `저장된 스냅샷을 읽을 수 없습니다: ${
+            tone: 'red',
+            text: `저장된 스냅샷을 불러오지 못했어요: ${
               err instanceof Error ? err.message : '알 수 없는 오류'
             }`,
           })
@@ -100,9 +96,9 @@ export default function App() {
 
         if (!result.followers.length && !result.following.length) {
           setNotice({
-            tone: 'danger',
+            tone: 'red',
             text:
-              '파일에서 팔로워/팔로잉 목록을 찾지 못했습니다. 내보내기에 "팔로워 및 팔로잉" 이 포함됐는지 확인해 주세요.',
+              '파일에서 팔로워·팔로잉 목록을 찾지 못했어요. 내보내기에 "팔로워 및 팔로잉"이 포함됐는지 확인해 주세요.',
           })
           return
         }
@@ -124,18 +120,18 @@ export default function App() {
 
         const prevNewest = existing[0]
         setNotice({
-          tone: 'success',
+          tone: 'green',
           text: prevNewest
-            ? `스냅샷을 저장했습니다. "${prevNewest.label}" 과 비교해 언팔로워를 계산했습니다.`
-            : `첫 스냅샷을 저장했습니다. 팔로워 ${result.followers.length.toLocaleString(
+            ? `스냅샷을 저장했어요. ‘${prevNewest.label}’과 비교해서 언팔로워를 찾았어요.`
+            : `첫 스냅샷을 저장했어요. 팔로워 ${result.followers.length.toLocaleString(
                 'ko-KR',
-              )}명, 팔로잉 ${result.following.length.toLocaleString('ko-KR')}명.`,
+              )}명, 팔로잉 ${result.following.length.toLocaleString('ko-KR')}명이에요.`,
         })
         setTab(prevNewest ? 'unfollowers' : 'crush')
       } catch (err) {
         setNotice({
-          tone: 'danger',
-          text: err instanceof Error ? err.message : '파일을 읽는 중 오류가 발생했습니다.',
+          tone: 'red',
+          text: err instanceof Error ? err.message : '파일을 읽는 중에 문제가 생겼어요.',
         })
       } finally {
         setBusy(false)
@@ -150,31 +146,22 @@ export default function App() {
     [current, baseline],
   )
 
-  const tabs = useMemo(() => {
-    return [
-      {
-        key: 'unfollowers' as const,
-        label: '언팔로워',
-        count: comparison?.unfollowers.length,
-        tone: 'danger' as const,
-      },
-      { key: 'crush' as const, label: '짝사랑', count: analysis?.notFollowingBack.length },
-      { key: 'fans' as const, label: '팬', count: analysis?.fans.length },
-      {
-        key: 'newFollowers' as const,
-        label: '새 팔로워',
-        count: comparison?.newFollowers.length,
-        tone: 'success' as const,
-      },
-      { key: 'mutual' as const, label: '맞팔', count: analysis?.mutual.length },
-      { key: 'snapshots' as const, label: '스냅샷', count: metas.length },
-    ]
-  }, [analysis, comparison, metas.length])
+  const tabs = useMemo<TabDef[]>(
+    () => [
+      { key: 'unfollowers', label: '언팔로워', count: comparison?.unfollowers.length, tone: 'red' },
+      { key: 'crush', label: '짝사랑', count: analysis?.notFollowingBack.length },
+      { key: 'fans', label: '팬', count: analysis?.fans.length },
+      { key: 'newFollowers', label: '새 팔로워', count: comparison?.newFollowers.length, tone: 'green' },
+      { key: 'mutual', label: '맞팔', count: analysis?.mutual.length },
+      { key: 'snapshots', label: '스냅샷', count: metas.length },
+    ],
+    [analysis, comparison, metas.length],
+  )
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        <Spinner className="h-6 w-6" />
+      <div className="flex min-h-screen items-center justify-center text-faint">
+        <Spinner className="h-7 w-7" />
       </div>
     )
   }
@@ -182,64 +169,58 @@ export default function App() {
   const hasData = current !== null
 
   return (
-    <div className="aurora min-h-screen">
-      <div className="relative z-10">
-        <Header
-          hasData={hasData}
-          busy={busy}
-          onFiles={handleFiles}
-        />
+    <div className="min-h-screen">
+      <Header hasData={hasData} busy={busy} onFiles={handleFiles} />
 
-        <main className="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6">
-          {notice && <NoticeBar notice={notice} onDismiss={() => setNotice(null)} />}
-          {warnings.length > 0 && <WarningBox warnings={warnings} />}
+      <main className="mx-auto w-full max-w-[720px] px-4 pb-24 sm:px-5">
+        {notice && <NoticeBar notice={notice} onDismiss={() => setNotice(null)} />}
+        {warnings.length > 0 && <WarningBox warnings={warnings} />}
 
-          {!hasData ? (
-            <Landing busy={busy} onFiles={handleFiles} />
-          ) : (
-            <Dashboard
-              current={current}
-              baseline={baseline}
-              analysis={analysis!}
-              comparison={comparison}
-              metas={metas}
-              tab={tab}
-              tabs={tabs}
-              onTab={setTab}
-              onPickCurrent={async (id) => {
-                await selectPair(metas, id)
-              }}
-              onPickBaseline={async (id) => {
-                await selectPair(metas, current.id, id)
-              }}
-              onDelete={async (id) => {
-                await deleteSnapshot(id)
-                const list = await listSnapshots()
-                setMetas(list)
-                const nextCurrent = current.id === id ? (list[0]?.id ?? null) : current.id
-                await selectPair(list, nextCurrent)
-              }}
-              onRename={async (id, label) => {
-                await renameSnapshot(id, label)
-                const list = await listSnapshots()
-                setMetas(list)
-                if (current.id === id) setCurrent({ ...current, label })
-                if (baseline?.id === id) setBaseline({ ...baseline, label })
-              }}
-              onClearAll={async () => {
-                if (!window.confirm('저장된 스냅샷을 모두 삭제합니다. 되돌릴 수 없습니다.')) return
-                await clearAll()
-                setMetas([])
-                setCurrent(null)
-                setBaseline(null)
-                setNotice({ tone: 'info', text: '모든 스냅샷을 삭제했습니다.' })
-              }}
-            />
-          )}
-        </main>
+        {!hasData ? (
+          <Landing busy={busy} onFiles={handleFiles} />
+        ) : (
+          <Dashboard
+            current={current}
+            baseline={baseline}
+            analysis={analysis!}
+            comparison={comparison}
+            metas={metas}
+            tab={tab}
+            tabs={tabs}
+            onTab={setTab}
+            onPickCurrent={async (id) => {
+              await selectPair(metas, id)
+            }}
+            onPickBaseline={async (id) => {
+              await selectPair(metas, current.id, id)
+            }}
+            onDelete={async (id) => {
+              await deleteSnapshot(id)
+              const list = await listSnapshots()
+              setMetas(list)
+              const nextCurrent = current.id === id ? (list[0]?.id ?? null) : current.id
+              await selectPair(list, nextCurrent)
+            }}
+            onRename={async (id, label) => {
+              await renameSnapshot(id, label)
+              const list = await listSnapshots()
+              setMetas(list)
+              if (current.id === id) setCurrent({ ...current, label })
+              if (baseline?.id === id) setBaseline({ ...baseline, label })
+            }}
+            onClearAll={async () => {
+              if (!window.confirm('저장된 스냅샷을 모두 삭제해요. 되돌릴 수 없어요.')) return
+              await clearAll()
+              setMetas([])
+              setCurrent(null)
+              setBaseline(null)
+              setNotice({ tone: 'neutral', text: '스냅샷을 모두 삭제했어요.' })
+            }}
+          />
+        )}
+      </main>
 
-        <Footer />
-      </div>
+      <Footer />
     </div>
   )
 }
@@ -254,22 +235,20 @@ function Header({
   onFiles: (files: File[]) => void
 }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-line/80 bg-ink/85 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3.5 sm:px-6">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-white">
-          <Icon name="logo" size={17} className="stroke-[2.2]" />
+    <header className="sticky top-0 z-20 bg-bg/85 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[720px] items-center gap-2.5 px-4 py-3 sm:px-5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-blue text-white">
+          <Icon name="logo" size={19} strokeWidth={2.4} />
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] leading-tight font-semibold tracking-tight">Instafloww</p>
-          <p className="truncate text-[11px] text-faint">인스타그램 언팔로워 찾기</p>
-        </div>
-        <span className="hidden sm:block">
-          <Pill tone="success">
-            <Icon name="shield" size={12} />
+        <p className="display flex-1 text-[18px] font-bold">Instafloww</p>
+        {hasData ? (
+          <Dropzone onFiles={onFiles} busy={busy} compact />
+        ) : (
+          <Pill tone="green">
+            <Icon name="lock" size={13} strokeWidth={2.2} />
             브라우저에서만 분석
           </Pill>
-        </span>
-        {hasData && <Dropzone onFiles={onFiles} busy={busy} compact />}
+        )}
       </div>
     </header>
   )
@@ -277,19 +256,19 @@ function Header({
 
 function NoticeBar({ notice, onDismiss }: { notice: NonNullable<Notice>; onDismiss: () => void }) {
   const tones = {
-    danger: 'border-danger/30 bg-danger-soft text-danger',
-    success: 'border-success/25 bg-success-soft text-success',
-    info: 'border-info/25 bg-info-soft text-info',
+    red: 'bg-red-weak text-red',
+    green: 'bg-green-weak text-green',
+    neutral: 'bg-sunken text-muted',
   }
   return (
     <div
       role="status"
-      className={cx('mt-5 flex items-start gap-2.5 rounded-xl border p-3.5 text-[13px]', tones[notice.tone])}
+      className={cx('mt-4 flex items-start gap-2.5 rounded-2xl p-4 text-[15px]', tones[notice.tone])}
     >
-      <Icon name={notice.tone === 'danger' ? 'alert' : 'check'} size={15} className="mt-px" />
-      <span className="flex-1 leading-relaxed">{notice.text}</span>
-      <button onClick={onDismiss} aria-label="닫기" className="opacity-60 hover:opacity-100">
-        <Icon name="x" size={14} />
+      <Icon name={notice.tone === 'red' ? 'info' : 'check'} size={18} className="mt-0.5" />
+      <span className="ko flex-1 leading-[1.6] font-medium">{notice.text}</span>
+      <button onClick={onDismiss} aria-label="닫기" className="mt-0.5 opacity-55 hover:opacity-100">
+        <Icon name="x" size={16} />
       </button>
     </div>
   )
@@ -297,9 +276,9 @@ function NoticeBar({ notice, onDismiss }: { notice: NonNullable<Notice>; onDismi
 
 function WarningBox({ warnings }: { warnings: string[] }) {
   return (
-    <div className="mt-3 rounded-xl border border-line bg-surface-2 p-3.5 text-[12px] text-muted">
-      <p className="mb-1.5 font-medium text-fg">읽는 중 건너뛴 항목</p>
-      <ul className="list-inside list-disc space-y-1">
+    <div className="mt-3 rounded-2xl bg-sunken p-4 text-[14px] text-muted">
+      <p className="mb-1.5 font-semibold text-fg-2">건너뛴 파일</p>
+      <ul className="ko list-inside list-disc space-y-1 leading-[1.6]">
         {warnings.map((w) => (
           <li key={w}>{w}</li>
         ))}
@@ -310,65 +289,69 @@ function WarningBox({ warnings }: { warnings: string[] }) {
 
 function Landing({ busy, onFiles }: { busy: boolean; onFiles: (files: File[]) => void }) {
   return (
-    <div className="pt-12 sm:pt-20">
-      <div className="mx-auto max-w-2xl text-center">
-        <Pill tone="brand">로그인 · 비밀번호 · 서버 업로드 없음</Pill>
-        <h1 className="mt-5 text-3xl leading-[1.15] font-semibold tracking-tight text-balance sm:text-5xl">
-          누가 나를 <span className="text-brand">언팔로우</span>했는지
-          <br className="hidden sm:block" /> 정확하게 찾아냅니다
+    <div className="pt-10 sm:pt-16">
+      <div className="text-center">
+        <h1 className="display text-[34px] leading-[1.32] font-bold sm:text-[48px]">
+          누가 나를
+          <br />
+          <span className="text-blue">언팔로우</span>했을까요?
         </h1>
-        <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-muted">
-          인스타그램이 공식으로 제공하는 <b className="text-fg">내 정보 다운로드</b> 파일을
-          이 페이지에 올리면 됩니다. 계정 정보를 요구하지 않으므로 계정이 정지될 위험도 없습니다.
+        <p className="ko mx-auto mt-4 max-w-[400px] text-[16px] leading-[1.65] text-muted sm:text-[17px]">
+          인스타그램에서 받은 내 정보 파일만 올리면 돼요.
+          <br className="hidden sm:block" /> 로그인도, 비밀번호도 필요 없어요.
         </p>
       </div>
 
-      <div className="mt-10">
+      <div className="mt-9">
         <Dropzone onFiles={onFiles} busy={busy} />
       </div>
 
-      <div className="mt-10 grid gap-4 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <FeatureCard
+          tone="red"
           title="언팔로워"
-          body="두 시점의 팔로워 목록을 비교해 그 사이에 떠난 사람만 골라냅니다."
-          tone="danger"
+          body="두 시점의 팔로워를 비교해서, 그 사이에 떠난 사람만 골라내요."
         />
         <FeatureCard
+          tone="blue"
           title="짝사랑 · 팬"
-          body="내가 팔로우하는데 맞팔하지 않는 계정, 반대로 나만 팔로우하는 계정을 바로 봅니다."
-          tone="brand"
+          body="내가 팔로우하는데 맞팔하지 않는 계정을 바로 확인할 수 있어요."
         />
         <FeatureCard
+          tone="green"
           title="완전한 비공개"
-          body="파일 해석과 저장이 모두 이 브라우저에서 끝납니다. 분석 서버가 아예 없습니다."
-          tone="success"
+          body="파일을 읽고 저장하는 일이 모두 이 브라우저 안에서 끝나요."
         />
       </div>
 
-      <Card className="mt-10 p-5 sm:p-7">
-        <h2 className="text-base font-semibold">데이터 내보내기 방법</h2>
-        <p className="mt-1 mb-6 text-[13px] text-muted">
-          처음 한 번만 하면 됩니다. 보통 몇 분 안에 받을 수 있습니다.
+      <Card className="mt-3 p-5 sm:p-7">
+        <h2 className="display text-[20px] font-bold">데이터 내보내는 방법</h2>
+        <p className="ko mt-1.5 mb-7 text-[15px] text-muted">
+          처음 한 번만 하면 돼요. 보통 몇 분 안에 받을 수 있어요.
         </p>
         <Guide />
       </Card>
 
-      <Card className="mt-4 p-5 sm:p-7">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Icon name="shield" size={17} className="text-success" />
+      <Card className="mt-3 p-5 sm:p-7">
+        <h2 className="display text-[20px] leading-[1.4] font-bold">
           언팔로워는 왜 두 번 올려야 하나요?
         </h2>
-        <p className="mt-3 text-[13px] leading-relaxed text-muted">
-          인스타그램 내보내기에는 <b className="text-fg">지금 팔로워가 누구인지</b>만 들어 있습니다.
-          과거에 누가 팔로워였는지는 기록되지 않기 때문에, 파일 한 개만으로 언팔로워를 알아내는
-          방법은 원리적으로 없습니다. 그래서 이 사이트는 올린 목록을 스냅샷으로 저장해 두고,
-          다음에 올린 파일과 비교합니다.
+        <p className="ko mt-3.5 text-[15px] leading-[1.7] text-muted">
+          인스타그램 내보내기에는 <b className="font-semibold text-fg-2">지금 팔로워가 누구인지</b>만
+          들어 있어요. 과거에 누가 팔로워였는지는 기록되지 않아서, 파일 하나만으로 언팔로워를
+          알아내는 방법은 원리적으로 없어요. 그래서 올린 목록을 스냅샷으로 저장해 두고, 다음에
+          올린 파일과 비교해요.
         </p>
-        <p className="mt-3 text-[13px] leading-relaxed text-muted">
-          다만 <b className="text-fg">짝사랑 · 팬 · 맞팔</b> 분석은 지금 당장 한 개만 올려도 나옵니다.
-          "팔로워를 알려준다"며 로그인을 요구하는 서비스는 비공식 접근이라 계정 정지나 계정 탈취로
-          이어질 수 있습니다.
+        <p className="ko mt-3.5 text-[15px] leading-[1.7] text-muted">
+          대신 <b className="font-semibold text-fg-2">짝사랑 · 팬 · 맞팔</b>은 지금 하나만 올려도
+          바로 볼 수 있어요.
         </p>
+        <div className="mt-5">
+          <InfoBox icon="lock">
+            “팔로워를 알려준다”면서 로그인을 요구하는 서비스는 비공식 접근이라, 계정이 정지되거나
+            탈취될 수 있어요. Instafloww는 계정 정보를 아예 받지 않아요.
+          </InfoBox>
+        </div>
       </Card>
     </div>
   )
@@ -381,19 +364,19 @@ function FeatureCard({
 }: {
   title: string
   body: string
-  tone: 'danger' | 'brand' | 'success'
+  tone: 'red' | 'blue' | 'green'
 }) {
-  const dots = { danger: 'bg-danger', brand: 'bg-brand', success: 'bg-success' }
+  const dots = { red: 'bg-red', blue: 'bg-blue', green: 'bg-green' }
   return (
     <Card className="p-5">
-      <span className={cx('mb-3 block h-2 w-2 rounded-full', dots[tone])} />
-      <p className="text-sm font-semibold">{title}</p>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{body}</p>
+      <span className={cx('mb-3 block h-2.5 w-2.5 rounded-full', dots[tone])} />
+      <p className="text-[17px] font-bold">{title}</p>
+      <p className="ko mt-1.5 text-[14px] leading-[1.6] text-muted">{body}</p>
     </Card>
   )
 }
 
-type TabDef = { key: TabKey; label: string; count?: number; tone?: 'danger' | 'success' }
+type TabDef = { key: TabKey; label: string; count?: number; tone?: 'red' | 'green' }
 
 function Dashboard({
   current,
@@ -429,42 +412,31 @@ function Dashboard({
     : null
 
   return (
-    <div className="pt-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="팔로워" value={analysis.followerCount} delta={followerDelta} />
-        <Stat label="팔로잉" value={analysis.followingCount} />
-        <Stat label="맞팔" value={analysis.mutual.length} />
-        <Stat
-          label="언팔로워"
-          value={comparison?.unfollowers.length ?? null}
-          tone="danger"
-          hint={comparison ? undefined : '스냅샷 2개 필요'}
-        />
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-faint">
-        <Icon name="clock" size={13} />
-        <span>
-          최신 <b className="text-muted">{current.label}</b>
-        </span>
+    <div className="pt-5">
+      {/* 지금 무엇과 무엇을 비교하고 있는지 */}
+      <div className="mb-3 flex items-center gap-2 px-1 text-[13px] text-faint">
+        <Icon name="clock" size={14} />
         {baseline ? (
-          <>
-            <span className="text-line-strong">·</span>
-            <span>
-              기준 <b className="text-muted">{baseline.label}</b> ({formatDateShort(baseline.createdAt)}{' '}
-              → {formatDateShort(current.createdAt)})
-            </span>
-          </>
+          <span className="tnum">{formatRange(baseline.createdAt, current.createdAt)} 비교</span>
         ) : (
-          <>
-            <span className="text-line-strong">·</span>
-            <span>비교 기준 없음</span>
-          </>
+          <span>{formatDay(current.createdAt)} 스냅샷 · 비교 기준 없음</span>
         )}
       </div>
 
-      <nav className="mt-5 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="flex gap-1.5 pb-1">
+      <div className="grid grid-cols-2 gap-3">
+        <Stat label="팔로워" value={analysis.followerCount} delta={followerDelta} />
+        <Stat
+          label="언팔로워"
+          value={comparison?.unfollowers.length ?? null}
+          tone="red"
+          hint={comparison ? undefined : '스냅샷 2개가 필요해요'}
+        />
+        <Stat label="팔로잉" value={analysis.followingCount} />
+        <Stat label="맞팔" value={analysis.mutual.length} />
+      </div>
+
+      <nav className="no-scrollbar -mx-4 mt-6 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
+        <div className="flex gap-2 pb-1">
           {tabs.map((t) => {
             const active = t.key === tab
             return (
@@ -472,24 +444,24 @@ function Dashboard({
                 key={t.key}
                 onClick={() => onTab(t.key)}
                 className={cx(
-                  'flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-medium transition-colors',
-                  active
-                    ? 'border-line-strong bg-surface-3 text-fg'
-                    : 'border-transparent text-muted hover:bg-surface-2 hover:text-fg',
+                  'flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold transition-colors',
+                  active ? 'bg-blue text-white' : 'bg-card text-muted shadow-card hover:text-fg',
                 )}
               >
                 {t.label}
                 {t.count !== undefined && (
                   <span
                     className={cx(
-                      'tnum rounded-md px-1.5 py-0.5 text-[11px]',
-                      t.count === 0
-                        ? 'bg-surface-3 text-faint'
-                        : t.tone === 'danger'
-                          ? 'bg-danger-soft text-danger'
-                          : t.tone === 'success'
-                            ? 'bg-success-soft text-success'
-                            : 'bg-surface-3 text-muted',
+                      'tnum rounded-full px-1.5 py-0.5 text-[12px] font-bold',
+                      active
+                        ? 'bg-white/22 text-white'
+                        : t.count === 0
+                          ? 'bg-bg text-faint'
+                          : t.tone === 'red'
+                            ? 'bg-red-weak text-red'
+                            : t.tone === 'green'
+                              ? 'bg-green-weak text-green'
+                              : 'bg-bg text-muted',
                     )}
                   >
                     {t.count.toLocaleString('ko-KR')}
@@ -547,16 +519,18 @@ function TabContent({
 }) {
   if (tab === 'snapshots') {
     return (
-      <SnapshotPanel
-        metas={metas}
-        currentId={current.id}
-        baselineId={baseline?.id ?? null}
-        onPickCurrent={onPickCurrent}
-        onPickBaseline={onPickBaseline}
-        onDelete={onDelete}
-        onRename={onRename}
-        onClearAll={onClearAll}
-      />
+      <Section title="저장된 스냅샷">
+        <SnapshotPanel
+          metas={metas}
+          currentId={current.id}
+          baselineId={baseline?.id ?? null}
+          onPickCurrent={onPickCurrent}
+          onPickBaseline={onPickBaseline}
+          onDelete={onDelete}
+          onRename={onRename}
+          onClearAll={onClearAll}
+        />
+      </Section>
     )
   }
 
@@ -569,12 +543,12 @@ function TabContent({
         title={isUnfollow ? '나를 언팔로우한 사람' : '새로 생긴 팔로워'}
         description={
           isUnfollow
-            ? `"${baseline!.label}" 에는 팔로워였지만 "${current.label}" 에는 없는 계정입니다.`
-            : `"${baseline!.label}" 이후에 새로 나를 팔로우한 계정입니다.`
+            ? `‘${baseline!.label}’에는 팔로워였지만 ‘${current.label}’에는 없는 계정이에요.`
+            : `‘${baseline!.label}’ 이후에 새로 나를 팔로우한 계정이에요.`
         }
         footnote={
           isUnfollow && mayContainRenames(comparison)
-            ? '아이디를 바꾼 계정이나 탈퇴·비활성화·차단된 계정도 여기에 섞여 보일 수 있습니다. 같은 사람이 "새 팔로워" 에도 다른 아이디로 들어 있다면 아이디 변경입니다.'
+            ? '아이디를 바꾼 계정이나 탈퇴·비활성화·차단된 계정도 여기에 섞여 보일 수 있어요. 같은 사람이 ‘새 팔로워’에도 다른 아이디로 있다면 아이디를 바꾼 거예요.'
             : undefined
         }
       >
@@ -585,15 +559,15 @@ function TabContent({
             isUnfollow ? (
               <Empty
                 icon="check"
-                tone="success"
-                title="언팔로우한 사람이 없습니다"
-                body="두 스냅샷 사이에 떠난 팔로워가 한 명도 없습니다."
+                tone="green"
+                title="언팔로우한 사람이 없어요"
+                body="두 스냅샷 사이에 떠난 팔로워가 한 명도 없어요."
               />
             ) : (
               <Empty
                 icon="clock"
-                title="새 팔로워가 없습니다"
-                body="두 스냅샷 사이에 새로 늘어난 팔로워가 없습니다."
+                title="새 팔로워가 없어요"
+                body="두 스냅샷 사이에 새로 늘어난 팔로워가 없어요."
               />
             )
           }
@@ -602,27 +576,30 @@ function TabContent({
     )
   }
 
-  const views: Record<'crush' | 'fans' | 'mutual', { title: string; description: string; users: IgUser[]; csv: string; empty: string }> = {
+  const views: Record<
+    'crush' | 'fans' | 'mutual',
+    { title: string; description: string; users: IgUser[]; csv: string; empty: string }
+  > = {
     crush: {
       title: '내가 팔로우하지만 맞팔하지 않는 계정',
-      description: '내 팔로잉에는 있는데 내 팔로워에는 없는 계정입니다. 처음 올린 파일 하나로 바로 나옵니다.',
+      description: '내 팔로잉에는 있는데 내 팔로워에는 없는 계정이에요. 파일 하나로 바로 나와요.',
       users: analysis.notFollowingBack,
       csv: 'instafloww-안맞팔',
-      empty: '내가 팔로우한 모든 계정이 나를 맞팔하고 있습니다.',
+      empty: '내가 팔로우한 모든 계정이 나를 맞팔하고 있어요.',
     },
     fans: {
       title: '나를 팔로우하지만 내가 맞팔하지 않는 계정',
-      description: '내 팔로워에는 있는데 내 팔로잉에는 없는 계정입니다.',
+      description: '내 팔로워에는 있는데 내 팔로잉에는 없는 계정이에요.',
       users: analysis.fans,
       csv: 'instafloww-팬',
-      empty: '모든 팔로워를 맞팔하고 있습니다.',
+      empty: '모든 팔로워를 맞팔하고 있어요.',
     },
     mutual: {
       title: '서로 팔로우하는 계정',
-      description: '내 팔로워이면서 내 팔로잉인 계정입니다.',
+      description: '내 팔로워이면서 내 팔로잉인 계정이에요.',
       users: analysis.mutual,
       csv: 'instafloww-맞팔',
-      empty: '맞팔 계정이 없습니다.',
+      empty: '맞팔 계정이 없어요.',
     },
   }
 
@@ -632,7 +609,7 @@ function TabContent({
       <UserList
         users={view.users}
         csvName={view.csv}
-        empty={<Empty icon="check" tone="success" title="해당하는 계정이 없습니다" body={view.empty} />}
+        empty={<Empty icon="check" tone="green" title="해당하는 계정이 없어요" body={view.empty} />}
       />
     </Section>
   )
@@ -645,20 +622,21 @@ function Section({
   children,
 }: {
   title: string
-  description: string
+  description?: string
   footnote?: string
   children: React.ReactNode
 }) {
   return (
     <div>
-      <div className="border-b border-line px-4 py-4 sm:px-5">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-muted">{description}</p>
+      <div className="px-4 pt-5 pb-4 sm:px-5">
+        <h2 className="display text-[19px] leading-[1.4] font-bold">{title}</h2>
+        {description && (
+          <p className="ko mt-1.5 text-[15px] leading-[1.6] text-muted">{description}</p>
+        )}
         {footnote && (
-          <p className="mt-2.5 flex gap-2 rounded-lg border border-line bg-surface-2 p-2.5 text-[12px] leading-relaxed text-faint">
-            <Icon name="alert" size={14} className="mt-px" />
-            <span>{footnote}</span>
-          </p>
+          <div className="mt-4">
+            <InfoBox>{footnote}</InfoBox>
+          </div>
         )}
       </div>
       {children}
@@ -668,18 +646,18 @@ function Section({
 
 function NeedsBaseline() {
   return (
-    <div className="px-5 py-16 text-center">
-      <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-info/30 bg-info-soft text-info">
-        <Icon name="clock" size={20} />
+    <div className="px-6 py-16 text-center">
+      <span className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-blue-weak text-blue">
+        <Icon name="clock" size={28} />
       </span>
-      <p className="text-sm font-semibold">아직 비교할 스냅샷이 없습니다</p>
-      <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-muted">
-        인스타그램 내보내기에는 "지금"의 팔로워만 들어 있어서, 언팔로워는 두 시점을 비교해야
-        알 수 있습니다. 1~2주 뒤에 내보내기를 한 번 더 받아 올려 주세요.
+      <p className="display text-[19px] font-bold">아직 비교할 스냅샷이 없어요</p>
+      <p className="ko mx-auto mt-2.5 max-w-[380px] text-[15px] leading-[1.65] text-muted">
+        인스타그램 내보내기에는 ‘지금’의 팔로워만 들어 있어서, 언팔로워는 두 시점을 비교해야 알 수
+        있어요. 1~2주 뒤에 한 번 더 받아서 올려주세요.
       </p>
-      <p className="mx-auto mt-3 max-w-md text-[13px] leading-relaxed text-muted">
-        그동안 <b className="text-fg">짝사랑</b> 과 <b className="text-fg">팬</b> 탭은 지금 바로
-        볼 수 있습니다.
+      <p className="ko mx-auto mt-3 max-w-[380px] text-[15px] leading-[1.65] text-muted">
+        그동안 <b className="font-semibold text-fg-2">짝사랑</b>과{' '}
+        <b className="font-semibold text-fg-2">팬</b> 탭은 지금 바로 볼 수 있어요.
       </p>
     </div>
   )
@@ -692,7 +670,7 @@ function Empty({
   body,
 }: {
   icon: 'check' | 'clock'
-  tone?: 'neutral' | 'success'
+  tone?: 'neutral' | 'green'
   title: string
   body: string
 }) {
@@ -700,16 +678,14 @@ function Empty({
     <>
       <span
         className={cx(
-          'mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border',
-          tone === 'success'
-            ? 'border-success/30 bg-success-soft text-success'
-            : 'border-line bg-surface-2 text-muted',
+          'mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px]',
+          tone === 'green' ? 'bg-green-weak text-green' : 'bg-sunken text-faint',
         )}
       >
-        <Icon name={icon} size={20} />
+        <Icon name={icon} size={28} />
       </span>
-      <p className="text-sm font-semibold">{title}</p>
-      <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-muted">{body}</p>
+      <p className="display text-[19px] font-bold">{title}</p>
+      <p className="ko mx-auto mt-2.5 max-w-[340px] text-[15px] leading-[1.65] text-muted">{body}</p>
     </>
   )
 }
@@ -724,30 +700,25 @@ function Stat({
   label: string
   value: number | null
   delta?: number | null
-  tone?: 'danger'
+  tone?: 'red'
   hint?: string
 }) {
   return (
-    <Card className="p-4">
-      <p className="text-[12px] text-muted">{label}</p>
+    <Card className="p-5">
+      <p className="text-[14px] font-medium text-muted">{label}</p>
       <p
         className={cx(
-          'tnum mt-1.5 text-2xl font-semibold tracking-tight',
-          value === null ? 'text-faint' : tone === 'danger' && value > 0 ? 'text-danger' : 'text-fg',
+          'tnum display mt-1 text-[30px] leading-[1.25] font-bold',
+          value === null ? 'text-line-strong' : tone === 'red' && value > 0 ? 'text-red' : 'text-fg',
         )}
       >
         {value === null ? '—' : value.toLocaleString('ko-KR')}
       </p>
-      {hint && <p className="mt-1 text-[11px] text-faint">{hint}</p>}
+      {hint && <p className="ko mt-1 text-[12px] text-faint">{hint}</p>}
       {delta !== null && delta !== undefined && delta !== 0 && (
-        <p
-          className={cx(
-            'tnum mt-1 text-[11px] font-medium',
-            delta > 0 ? 'text-success' : 'text-danger',
-          )}
-        >
+        <p className={cx('tnum mt-1 text-[13px] font-semibold', delta > 0 ? 'text-green' : 'text-red')}>
           {delta > 0 ? '+' : ''}
-          {delta.toLocaleString('ko-KR')} (기준 대비)
+          {delta.toLocaleString('ko-KR')}
         </p>
       )}
     </Card>
@@ -756,17 +727,15 @@ function Stat({
 
 function Footer() {
   return (
-    <footer className="border-t border-line/70">
-      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
-        <p className="text-[12px] leading-relaxed text-faint">
-          Instafloww 는 인스타그램 공식 데이터 내보내기 파일만 사용합니다. 계정 로그인 정보를
-          요구하지 않고, 분석 결과를 어디에도 전송하지 않습니다. 저장된 스냅샷은 이 브라우저의
-          IndexedDB 에만 있으며, 브라우저 데이터를 지우면 함께 사라집니다.
-        </p>
-        <p className="mt-2 text-[12px] text-faint">
-          Instagram 은 Meta Platforms, Inc. 의 상표이며 이 프로젝트와 아무 관련이 없습니다.
-        </p>
-      </div>
+    <footer className="mx-auto w-full max-w-[720px] px-5 pb-12">
+      <p className="ko text-[13px] leading-[1.7] text-faint">
+        Instafloww는 인스타그램 공식 데이터 내보내기 파일만 사용해요. 계정 로그인 정보를 요구하지
+        않고, 분석 결과를 어디에도 전송하지 않아요. 저장된 스냅샷은 이 브라우저의 IndexedDB에만
+        있어서, 브라우저 데이터를 지우면 함께 사라져요.
+      </p>
+      <p className="ko mt-2 text-[13px] text-faint">
+        Instagram은 Meta Platforms, Inc.의 상표이며 이 프로젝트와 아무 관련이 없어요.
+      </p>
     </footer>
   )
 }
