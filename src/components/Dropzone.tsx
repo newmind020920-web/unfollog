@@ -43,14 +43,14 @@ export function Dropzone({
       onDrop={handleDrop}
       className={cx(
         'rounded-[20px] px-6 py-10 text-center transition-colors sm:py-14',
-        hovering ? 'bg-blue-weak' : 'bg-card shadow-card',
+        hovering ? 'bg-brand-weak' : 'bg-card shadow-card',
         busy && 'opacity-70',
       )}
     >
       <div
         className={cx(
           'mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] transition-colors',
-          hovering ? 'bg-blue text-white' : 'bg-blue-weak text-blue',
+          hovering ? 'bg-brand text-white' : 'bg-brand-weak text-brand',
         )}
       >
         {busy ? <Spinner className="h-6 w-6" /> : <Icon name="upload" size={26} />}

@@ -26,7 +26,7 @@ const STEPS: { title: React.ReactNode; body: React.ReactNode }[] = [
           href={DYI_URL}
           target="_blank"
           rel="noreferrer noopener"
-          className="mt-2.5 flex w-fit items-center gap-1 font-semibold text-blue"
+          className="mt-2.5 flex w-fit items-center gap-1 font-semibold text-brand"
         >
           인스타그램에서 바로 열기
           <Icon name="chevron" size={15} />
@@ -93,7 +93,7 @@ export function Guide() {
       <ol className="space-y-6">
         {STEPS.map((step, i) => (
           <li key={i} className="flex gap-3.5">
-            <span className="tnum mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue text-[14px] font-bold text-white">
+            <span className="tnum mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-[14px] font-bold text-white">
               {i + 1}
             </span>
             <div className="min-w-0 pt-0.5">

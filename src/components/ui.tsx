@@ -33,7 +33,7 @@ export function Button({
     lg: 'h-[54px] rounded-[14px] px-6 text-[17px]',
   }
   const variants = {
-    primary: 'bg-blue text-white hover:bg-blue-hover',
+    primary: 'bg-brand text-white hover:bg-brand-hover',
     default: 'bg-sunken text-fg-2 hover:bg-line',
     ghost: 'text-muted hover:bg-sunken hover:text-fg',
     danger: 'bg-red-weak text-red hover:brightness-95',
@@ -58,11 +58,11 @@ export function Pill({
   tone = 'neutral',
 }: {
   children: ReactNode
-  tone?: 'neutral' | 'blue' | 'red' | 'green'
+  tone?: 'neutral' | 'brand' | 'red' | 'green'
 }) {
   const tones = {
     neutral: 'bg-sunken text-muted',
-    blue: 'bg-blue-weak text-blue',
+    brand: 'bg-brand-weak text-brand',
     red: 'bg-red-weak text-red',
     green: 'bg-green-weak text-green',
   }
@@ -85,12 +85,12 @@ export function InfoBox({
   children,
 }: {
   icon?: IconName
-  tone?: 'neutral' | 'blue'
+  tone?: 'neutral' | 'brand'
   children: ReactNode
 }) {
   const tones = {
     neutral: 'bg-sunken text-muted',
-    blue: 'bg-blue-weak text-blue',
+    brand: 'bg-brand-weak text-brand',
   }
   return (
     <div className={cx('flex gap-2.5 rounded-2xl p-4 text-[14px] leading-[1.6]', tones[tone])}>

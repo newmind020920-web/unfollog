@@ -18,9 +18,9 @@
   --color-muted: #6b7684;
   --color-faint: #8b95a1;
 
-  --color-blue: #3182f6;
-  --color-blue-hover: #1b64da;
-  --color-blue-weak: #e8f3ff;
+  --color-brand: #8e33c4;
+  --color-brand-hover: #7a2aa9;
+  --color-brand-weak: #f6ebfc;
   --color-red: #f04452;
   --color-red-weak: #fdf0f1;
   --color-green: #15c47e;
@@ -55,9 +55,9 @@
     --color-muted: #9ba3ad;
     --color-faint: #7c848e;
 
-    --color-blue: #4593fc;
-    --color-blue-hover: #6aa9fd;
-    --color-blue-weak: #16243a;
+    --color-brand: #a855e8;
+    --color-brand-hover: #b873ee;
+    --color-brand-weak: #2c1740;
     --color-red: #ff6b78;
     --color-red-weak: #33191d;
     --color-green: #2dd68f;
@@ -82,9 +82,9 @@
   --color-muted: #9ba3ad;
   --color-faint: #7c848e;
 
-  --color-blue: #4593fc;
-  --color-blue-hover: #6aa9fd;
-  --color-blue-weak: #16243a;
+  --color-brand: #a855e8;
+  --color-brand-hover: #b873ee;
+  --color-brand-weak: #2c1740;
   --color-red: #ff6b78;
   --color-red-weak: #33191d;
   --color-green: #2dd68f;
@@ -127,12 +127,12 @@ body {
 }
 
 ::selection {
-  background: var(--color-blue);
+  background: var(--color-brand);
   color: #fff;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--color-blue);
+  outline: 2px solid var(--color-brand);
   outline-offset: 2px;
   border-radius: 8px;
 }
@@ -171,4 +171,12 @@ body::before {
   .animate-spin {
     animation-duration: 2.5s;
   }
+}
+
+/*
+ * 로고 바탕. 인스타그램과 같은 보라→자홍→호박 계열이되, 색을 그대로 쓰지 않고
+ * 자체 값으로 잡았습니다. 브랜드 자산을 베끼면 제휴처럼 보일 수 있습니다.
+ */
+.brand-mark {
+  background: linear-gradient(45deg, #f7963c 0%, #d42e86 52%, #7b3fe4 100%);
 }

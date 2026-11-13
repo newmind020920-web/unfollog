@@ -56,7 +56,7 @@ const VIEWS = [
 type View = (typeof VIEWS)[number]
 type ListView = Exclude<View, 'home' | 'snapshots'>
 
-type Tone = 'red' | 'green' | 'blue' | 'neutral'
+type Tone = 'red' | 'green' | 'brand' | 'neutral'
 type Notice = { tone: 'red' | 'green' | 'neutral'; text: string } | null
 
 type ListDef = {
@@ -447,7 +447,7 @@ function Header({
     <header className="sticky-header sticky z-20 bg-bg/85 backdrop-blur-xl">
       <div className="gutter mx-auto flex w-full max-w-[680px] items-center gap-2.5 py-3">
         <button onClick={onHome} className="flex min-w-0 flex-1 items-center gap-2.5" aria-label="처음 화면으로">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-blue text-white">
+          <span className="brand-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] text-white">
             <Icon name="logo" size={19} strokeWidth={2.4} />
           </span>
           <span className="display truncate text-[18px] font-bold">Instafloww</span>
@@ -515,7 +515,7 @@ function Landing({
         <h1 className="display text-[34px] leading-[1.32] font-bold sm:text-[46px]">
           누가 나를
           <br />
-          <span className="text-blue">언팔</span>했을까요?
+          <span className="text-brand">언팔</span>했을까요?
         </h1>
         <p className="ko mx-auto mt-4 max-w-[400px] text-[16px] leading-[1.65] text-muted sm:text-[17px]">
           인스타그램에서 받은 내 정보 파일만 올리면 돼요.
@@ -605,7 +605,7 @@ function IconBadge({ icon, tone }: { icon: IconName; tone: Tone }) {
   const tones = {
     red: 'bg-red-weak text-red',
     green: 'bg-green-weak text-green',
-    blue: 'bg-blue-weak text-blue',
+    brand: 'bg-brand-weak text-brand',
     neutral: 'bg-sunken text-muted',
   }
   return (
@@ -729,7 +729,7 @@ function buildLists(
       label: '나를 팔로우하는 사람',
       description: '지금 나를 팔로우하고 있는 모든 계정이에요.',
       icon: 'users',
-      tone: 'blue',
+      tone: 'brand',
       users: current.followers,
       csv: 'instafloww-나를-팔로우하는-사람',
       emptyTitle: '나를 팔로우하는 사람이 없어요',
@@ -741,7 +741,7 @@ function buildLists(
       label: '내가 팔로우하는 사람',
       description: '지금 내가 팔로우하고 있는 모든 계정이에요.',
       icon: 'userCheck',
-      tone: 'blue',
+      tone: 'brand',
       users: current.following,
       csv: 'instafloww-내가-팔로우하는-사람',
       emptyTitle: '내가 팔로우하는 사람이 없어요',
@@ -753,7 +753,7 @@ function buildLists(
       label: '서로 팔로우하는 사람',
       description: '나도 팔로우하고, 상대도 나를 팔로우하는 계정이에요.',
       icon: 'swap',
-      tone: 'blue',
+      tone: 'brand',
       users: analysis.mutual,
       csv: 'instafloww-서로-팔로우하는-사람',
       emptyTitle: '서로 팔로우하는 사람이 없어요',
@@ -855,8 +855,8 @@ function Home({
   return (
     <div className="pt-4">
       {current.sample && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-blue-weak px-4 py-3.5">
-          <p className="ko min-w-0 flex-1 text-[14px] leading-[1.55] font-medium text-blue">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-weak px-4 py-3.5">
+          <p className="ko min-w-0 flex-1 text-[14px] leading-[1.55] font-medium text-brand">
             샘플 데이터를 보고 있어요. 실제 계정 정보가 아니에요.
           </p>
           <Button size="sm" variant="card" onClick={onRemoveSamples}>
@@ -873,7 +873,7 @@ function Home({
               <>
                 내가 팔로우하는 사람 중
                 <br />
-                <span className="text-blue">{num(oneWay)}명</span>이 맞팔하지 않아요
+                <span className="text-brand">{num(oneWay)}명</span>이 맞팔하지 않아요
               </>
             ) : (
               <>
@@ -973,7 +973,7 @@ function OneWayCard({ def, onOpen }: { def: ListDef; onOpen: (v: View) => void }
       >
         {/* 좁은 화면에서 제목과 숫자가 한 줄에서 서로를 밀지 않도록 줄을 나눕니다. */}
         <span className="flex items-center gap-3.5">
-          <IconBadge icon={def.icon} tone="blue" />
+          <IconBadge icon={def.icon} tone="brand" />
           <span className="ko min-w-0 flex-1 text-[16px] leading-[1.35] font-bold">{def.label}</span>
           <Icon name="chevron" size={18} className="shrink-0 text-line-strong" />
         </span>
@@ -1101,7 +1101,7 @@ function Detail({
           <h1 className="display text-[22px] leading-[1.4] font-bold" data-title>
             {title}
             {count !== undefined && (
-              <span className="tnum ml-2 text-blue" data-total>
+              <span className="tnum ml-2 text-brand" data-total>
                 {num(count)}명
               </span>
             )}
@@ -1124,7 +1124,7 @@ function Detail({
 function NeedsBaseline() {
   return (
     <div className="px-6 pt-8 pb-14 text-center">
-      <span className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-blue-weak text-blue">
+      <span className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] bg-brand-weak text-brand">
         <Icon name="clock" size={28} />
       </span>
       <p className="display text-[19px] font-bold">아직 비교할 파일이 없어요</p>

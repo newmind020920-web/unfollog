@@ -61,7 +61,7 @@ export function SnapshotPanel({
               data-snapshot={meta.id}
               className={cx(
                 'rounded-2xl p-4 transition-colors',
-                isCurrent ? 'bg-blue-weak' : 'bg-sunken',
+                isCurrent ? 'bg-brand-weak' : 'bg-sunken',
                 isBaseline && 'ring-1 ring-line-strong',
               )}
             >
@@ -92,7 +92,7 @@ export function SnapshotPanel({
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-[16px] font-bold">{meta.label}</p>
-                  {isCurrent && <Pill tone="blue">지금 보는 것</Pill>}
+                  {isCurrent && <Pill tone="brand">지금 보는 것</Pill>}
                   {isBaseline && <Pill tone="neutral">비교 시작</Pill>}
                   <button
                     onClick={() => {
@@ -161,7 +161,7 @@ export function SnapshotPanel({
 
       {metas.length === 1 && (
         <div className="mt-4">
-          <InfoBox icon="clock" tone="blue">
+          <InfoBox icon="clock" tone="brand">
             스냅샷이 하나라 아직 나를 언팔한 사람을 알 수 없어요. 1~2주 뒤에 내보내기를 한 번 더
             받아서 올리면, 그 사이에 떠난 사람이 정확히 나와요.
           </InfoBox>
