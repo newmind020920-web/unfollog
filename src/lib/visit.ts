@@ -34,9 +34,14 @@ export function ping(detail: { uploaded?: boolean; snapshots?: number } = {}) {
   if (!code) return
 
   const payload = JSON.stringify({ code, ...detail })
+
+  // 보내는 형식을 text/plain 으로 둡니다. application/json 으로 보내면
+  // 브라우저가 CORS 사전 요청(preflight)을 요구하는데, sendBeacon 은 그것을
+  // 하지 못해 조용히 실패합니다. 서버는 형식과 상관없이 본문을 JSON 으로 읽습니다.
+  const TYPE = 'text/plain;charset=UTF-8'
   try {
     // sendBeacon 은 페이지를 떠나는 중에도 전송을 보장합니다.
-    if (navigator.sendBeacon?.(`${API}/v`, new Blob([payload], { type: 'application/json' }))) {
+    if (navigator.sendBeacon?.(`${API}/v`, new Blob([payload], { type: TYPE }))) {
       return
     }
   } catch {
@@ -44,7 +49,7 @@ export function ping(detail: { uploaded?: boolean; snapshots?: number } = {}) {
   }
   void fetch(`${API}/v`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': TYPE },
     body: payload,
     keepalive: true,
   }).catch(() => {})
