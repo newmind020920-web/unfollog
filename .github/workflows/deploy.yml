@@ -1,0 +1,50 @@
+# 기본 브랜치에 올리면 검사하고 GitHub Pages 로 배포합니다.
+name: deploy
+
+on:
+  push:
+    branches: [ccr-fed3e512-uj8jsj, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포가 겹치지 않게 한 번에 하나만 돌립니다.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # 검사가 하나라도 깨지면 배포하지 않습니다.
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      # enablement: 저장소에 Pages 가 꺼져 있으면 켭니다.
+      # 조직 정책 등으로 실패하면 Settings → Pages 에서 직접 켜 주세요.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
