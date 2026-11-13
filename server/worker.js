@@ -6,17 +6,15 @@
  *
  *   POST /v      방문·업로드 기록
  *   GET  /admin  관리자 화면 (ADMIN_KEY 필요)
+ *
+ * Cloudflare 편집기에 그대로 붙여넣을 수 있도록 순수 자바스크립트로 씁니다.
+ *
+ * @typedef {{ DB: D1Database, ADMIN_KEY: string, ALLOWED_ORIGIN: string }} Env
  */
-
-export interface Env {
-  DB: D1Database
-  ADMIN_KEY: string
-  ALLOWED_ORIGIN: string
-}
 
 const CODE_RE = /^[0-9a-f]{16}$/
 
-function cors(origin: string) {
+function cors(origin) {
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -27,11 +25,11 @@ function cors(origin: string) {
 
 /** 서버 시각 기준 한국 날짜. 하루 한 번만 세기 위한 기준입니다. */
 function todayKST(now = Date.now()) {
-  return new Date(now + 9 * 3600_000).toISOString().slice(0, 10)
+  return new Date(now + 9 * 3600000).toISOString().slice(0, 10)
 }
 
-async function recordVisit(env: Env, body: unknown) {
-  const b = (body ?? {}) as Record<string, unknown>
+async function recordVisit(env, body) {
+  const b = body || {}
   const code = typeof b.code === 'string' ? b.code : ''
   if (!CODE_RE.test(code)) return new Response('bad code', { status: 400 })
 
@@ -57,33 +55,32 @@ async function recordVisit(env: Env, body: unknown) {
   return new Response(null, { status: 204 })
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 }
 
-async function adminPage(env: Env) {
+async function adminPage(env) {
   const totals = await env.DB.prepare(
     `SELECT
-       COUNT(*)                                   AS people,
-       SUM(CASE WHEN visits >= 2 THEN 1 ELSE 0 END) AS returned,
-       SUM(CASE WHEN uploads >= 1 THEN 1 ELSE 0 END) AS uploaded,
-       SUM(CASE WHEN snapshots >= 2 THEN 1 ELSE 0 END) AS compared,
-       SUM(uploads)                               AS upload_total
+       COUNT(*)                                     AS people,
+       SUM(CASE WHEN visits >= 2 THEN 1 ELSE 0 END)   AS returned,
+       SUM(CASE WHEN uploads >= 1 THEN 1 ELSE 0 END)  AS uploaded,
+       SUM(CASE WHEN snapshots >= 2 THEN 1 ELSE 0 END) AS compared
      FROM visitor`,
-  ).first<Record<string, number>>()
+  ).first()
 
   const rows = await env.DB.prepare(
     `SELECT code, first_at, last_at, visits, uploads, snapshots
      FROM visitor ORDER BY last_at DESC LIMIT 200`,
-  ).all<Record<string, number | string>>()
+  ).all()
 
-  const people = Number(totals?.people ?? 0)
-  const returned = Number(totals?.returned ?? 0)
-  const compared = Number(totals?.compared ?? 0)
+  const people = Number((totals && totals.people) || 0)
+  const returned = Number((totals && totals.returned) || 0)
+  const compared = Number((totals && totals.compared) || 0)
+  const uploadedPeople = Number((totals && totals.uploaded) || 0)
   const rate = people ? Math.round((returned / people) * 100) : 0
   const compareRate = people ? Math.round((compared / people) * 100) : 0
-  const fmt = (ms: unknown) =>
-    new Date(Number(ms)).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+  const fmt = (ms) => new Date(Number(ms)).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
 
   const body = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -110,7 +107,7 @@ async function adminPage(env: Env) {
 <div class="cards">
   <div class="c"><div class="l">전체 방문자</div><div class="n">${people}</div></div>
   <div class="c"><div class="l">2번 이상 온 사람</div><div class="n">${returned}</div><div class="s">재방문율 ${rate}%</div></div>
-  <div class="c"><div class="l">파일을 올린 사람</div><div class="n">${Number(totals?.uploaded ?? 0)}</div></div>
+  <div class="c"><div class="l">파일을 올린 사람</div><div class="n">${uploadedPeople}</div></div>
   <div class="c"><div class="l">두 번 이상 올린 사람</div><div class="n">${compared}</div><div class="s">${compareRate}% · 언팔을 실제로 본 사람</div></div>
 </div>
 <table>
@@ -131,7 +128,8 @@ ${rows.results
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  /** @param {Request} request @param {Env} env */
+  async fetch(request, env) {
     const url = new URL(request.url)
     const origin = env.ALLOWED_ORIGIN
 
@@ -143,7 +141,7 @@ export default {
       // 우리 사이트에서 온 요청만 받습니다.
       const from = request.headers.get('origin')
       if (from && from !== origin) return new Response('forbidden', { status: 403 })
-      let body: unknown
+      let body
       try {
         body = await request.json()
       } catch {

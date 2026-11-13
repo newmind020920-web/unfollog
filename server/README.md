@@ -14,10 +14,26 @@ Cloudflare Workers + D1. 무료 한도(하루 10만 요청) 안에서 충분히 
 코드는 브라우저가 스스로 만들어 `localStorage` 에 둡니다. 서버는 그 코드가
 누구인지 알 방법이 없습니다. 브라우저 데이터를 지우면 새 코드가 발급됩니다.
 
-## 배포 (한 번만)
+`worker.js` 는 순수 자바스크립트입니다. Cloudflare 대시보드 편집기에 그대로
+붙여넣을 수 있습니다. (타입 표기가 있으면 편집기가 전부 오류로 잡습니다.)
+
+## 배포 — 브라우저에서 (CLI 없이)
+
+1. **Storage & Databases → D1** → `Create` → 이름 `unfollog`
+2. 만든 DB → **Console** 탭 → `schema.sql` 내용을 붙여넣고 실행
+3. **Workers & Pages** → `Create` → Hello World → 이름 `unfollog-api` → Deploy
+4. 만든 Worker → **Edit code** → 전부 지우고 `worker.js` 내용 붙여넣기 → Deploy
+5. Worker → **Settings → Bindings** → `Add` → **D1 database**
+   - Variable name `DB`, Database `unfollog`
+6. 같은 화면 **Variables and Secrets**
+   - `ALLOWED_ORIGIN` = 사이트 주소 (Text)
+   - `ADMIN_KEY` = 길고 추측하기 어려운 값 (**Secret**)
+
+## 배포 — 명령줄로
 
 ```bash
 cd server
+npm i -D wrangler
 npx wrangler login
 
 # 1) 데이터베이스 만들기 → 출력된 database_id 를 wrangler.toml 에 적습니다

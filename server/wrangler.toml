@@ -1,5 +1,5 @@
 name = "unfollog-api"
-main = "worker.ts"
+main = "worker.js"
 compatibility_date = "2026-01-01"
 
 # 관리자 화면 열쇠. 아래 명령으로 넣습니다 (코드에 적지 마세요).
