@@ -192,6 +192,26 @@ export function Icon({
   )
 }
 
+/**
+ * 인스타그램 기본 프로필 사진과 같은 회색 실루엣.
+ * 실제 프로필 사진은 내보내기 파일에 들어 있지 않고, 인스타그램 서버에서
+ * 받아오면 방문 기록이 남기 때문에 쓰지 않습니다.
+ */
+export function Avatar({ size = 44 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden
+      style={{ width: size, height: size }}
+      className="block shrink-0 overflow-hidden rounded-full bg-sunken"
+    >
+      <svg viewBox="0 0 44 44" className="h-full w-full text-line-strong" fill="currentColor">
+        <circle cx="22" cy="17.2" r="7" />
+        <ellipse cx="22" cy="39.5" rx="12.8" ry="11.8" />
+      </svg>
+    </span>
+  )
+}
+
 const DAY = ['일', '월', '화', '수', '목', '금', '토']
 
 export function formatDate(ms: number) {

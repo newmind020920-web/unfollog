@@ -2,7 +2,7 @@ import type { IgUser, ParseResult } from '../types'
 import { readZipIndex, readZipEntryText, ZipError, type ZipEntry } from './zip'
 
 /**
- * 인스타그램 "내 정보 다운로드" 결과를 파싱합니다.
+ * 인스타그램 "내 정보 내보내기" 결과를 파싱합니다.
  *
  * 받는 형태:
  *  - 내보내기 ZIP 통째로

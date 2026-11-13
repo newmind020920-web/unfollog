@@ -200,8 +200,8 @@ export default function App() {
         return
       }
       const curr = await getSnapshot(currentId)
-      setCurrent(curr ?? null)
       if (!curr) {
+        setCurrent(null)
         setBaseline(null)
         setTrace(null)
         return
@@ -211,7 +211,6 @@ export default function App() {
       const resolvedBaselineId =
         baselineId !== undefined ? baselineId : (older[older.length - 1]?.id ?? null)
       const base = resolvedBaselineId ? ((await getSnapshot(resolvedBaselineId)) ?? null) : null
-      setBaseline(base)
 
       // 시작 지점부터 지금 보는 스냅샷까지 훑어 떠난 시점을 좁힙니다.
       const tracker = departureTracker()
@@ -220,6 +219,11 @@ export default function App() {
         to: curr.createdAt,
         preloaded: curr,
       })
+
+      // 셋을 한꺼번에 반영합니다. 먼저 반영하면 떠난 사람을 아직 세지 못한
+      // 중간 상태가 한 번 그려져서 첫 문장이 깜빡입니다.
+      setCurrent(curr)
+      setBaseline(base)
       setTrace(tracker.result())
     },
     [],

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import type { IgUser } from '../types'
 import { download, toCsv } from '../lib/export'
-import { Button, Icon, cx } from './ui'
+import { Avatar, Button, Icon, cx } from './ui'
 
 const PAGE = 100
 
@@ -221,12 +221,7 @@ export function UserList({
 function Row({ user, note, tag }: { user: IgUser; note?: string; tag?: string }) {
   const body = (
     <>
-      <span
-        aria-hidden
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sunken text-[16px] font-bold text-faint uppercase"
-      >
-        {user.display.replace(/^demo_/, '').slice(0, 1)}
-      </span>
+      <Avatar />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <span className="truncate text-[16px] leading-[1.4] font-semibold">@{user.display}</span>
