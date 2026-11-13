@@ -44,7 +44,7 @@ import {
 const VIEWS = [
   'home',
   'unfollowers',
-  'maybe-blocked',
+  'blocked',
   'renamed',
   'new-followers',
   'followers',
@@ -536,7 +536,7 @@ function Landing({
       <Card className="mt-3 px-5 py-2">
         <ul>
           <PreviewRow icon="userMinus" tone="red" label="나를 언팔한 사람" body="누가, 대략 언제 떠났는지 찾아요" />
-          <PreviewRow icon="ban" tone="red" label="나를 차단했을 수 있는 사람" body="서로 팔로우하다 양쪽에서 함께 사라진 계정" />
+          <PreviewRow icon="ban" tone="red" label="차단 의심 계정" body="서로 팔로우하다 양쪽에서 동시에 사라진 계정" />
           <PreviewRow icon="userX" tone="neutral" label="나를 맞팔하지 않는 사람" body="내가 팔로우하지만 상대는 안 하는 계정" last />
         </ul>
       </Card>
@@ -649,7 +649,7 @@ function buildLists(
   const maybeBlocked = ready ? trace.departures.filter((d) => d.reason === 'blockedOrGone') : null
   const renames = ready ? trace.renames : null
   const unsure = new Map(
-    (left ?? []).filter((d) => d.reason === 'unknown').map((d) => [d.user.username, '차단일 수도']),
+    (left ?? []).filter((d) => d.reason === 'unknown').map((d) => [d.user.username, '구분 불가']),
   )
   const renamedTo = new Set((renames ?? []).map((r) => r.to.username))
 
@@ -659,7 +659,7 @@ function buildLists(
   const myBlocksNote =
     trace && trace.blockedByMeCount > 0 ? ` 내가 차단한 ${num(trace.blockedByMeCount)}명은 뺐어요.` : ''
   const howToCheck =
-    '확인하는 방법: 아이디를 눌러 프로필을 열어 보세요. 로그인한 상태에서는 안 보이는데 로그아웃한 브라우저에서는 보이면 차단이에요. 둘 다 안 보이면 계정이 비활성화되거나 삭제된 거예요.'
+    '확인하는 방법: 아이디를 눌러 프로필을 열어 보세요. 로그인한 상태에서는 안 보이는데 로그아웃한 브라우저에서는 보이면 차단입니다. 둘 다 안 보이면 계정이 비활성화되거나 삭제된 거예요.'
 
   return {
     unfollowers: {
@@ -672,16 +672,16 @@ function buildLists(
       timeline,
       tags: unsure.size ? unsure : undefined,
       footnote: unsure.size
-        ? '‘차단일 수도’ 표시는 내가 팔로우하지 않던 계정이에요. 이 경우에는 상대가 언팔한 건지 차단한 건지 파일만으로 구분할 수 없어요. 표시가 없는 계정은 언팔이 확실해요.'
+        ? '표시가 없는 계정은 언팔이 확실합니다. 내 팔로잉에 그대로 남아 있으니까요. ‘구분 불가’는 내가 팔로우하지 않던 계정이라 언팔인지 차단인지 가려낼 근거가 없는 경우예요.'
         : undefined,
       csv: 'instafloww-나를-언팔한-사람',
       emptyTitle: '나를 언팔한 사람이 없어요',
       emptyBody: '저장된 스냅샷 사이에 떠난 팔로워가 한 명도 없어요.',
     },
-    'maybe-blocked': {
-      view: 'maybe-blocked',
-      label: '나를 차단했을 수 있는 사람',
-      description: `서로 팔로우하던 사이인데, 내가 끊지 않았는데도 내 팔로워와 팔로잉 양쪽에서 함께 사라진 계정이에요. 상대가 나를 차단했거나, 계정을 비활성화·삭제하면 이렇게 돼요.${timingNote}`,
+    'blocked': {
+      view: 'blocked',
+      label: '차단 의심 계정',
+      description: `차단당하면 서로의 팔로우가 함께 끊어집니다. 아래 계정은 서로 팔로우하던 사이인데, 내가 끊지 않았는데도 내 팔로워와 팔로잉에서 동시에 사라졌어요. 계정 비활성화·삭제도 같은 모습이라 확인이 필요합니다.${timingNote}`,
       icon: 'ban',
       tone: 'red',
       users: maybeBlocked ? maybeBlocked.map((d) => d.user) : null,
@@ -690,8 +690,8 @@ function buildLists(
         trace && !trace.hasUnfollowLog
           ? `올린 파일에 ‘최근에 언팔한 계정’ 기록이 없어서, 내가 직접 언팔한 계정이 섞여 있을 수 있어요. ${howToCheck}`
           : howToCheck,
-      csv: 'instafloww-나를-차단했을-수-있는-사람',
-      emptyTitle: '차단했을 수 있는 사람이 없어요',
+      csv: 'instafloww-차단-의심-계정',
+      emptyTitle: '차단 의심 계정이 없어요',
       emptyBody: '서로 팔로우하다가 양쪽 목록에서 함께 사라진 계정이 없어요.',
     },
     renamed: {
@@ -842,7 +842,7 @@ function Home({
   lists,
 }: WorkspaceProps & { lists: Record<ListView, ListDef> }) {
   const unfollowed = lists.unfollowers.users?.length ?? null
-  const maybeBlocked = lists['maybe-blocked'].users?.length ?? 0
+  const maybeBlocked = lists['blocked'].users?.length ?? 0
   const oneWay = analysis.notFollowingBack.length
   // 스냅샷이 셋 이상이면 "지난번"이 아니라 실제 시작 날짜를 말해 줍니다.
   const since =
@@ -904,11 +904,11 @@ function Home({
         </p>
         {maybeBlocked > 0 && (
           <button
-            onClick={() => go('maybe-blocked')}
+            onClick={() => go('blocked')}
             data-blocked-hint
             className="ko mt-3 inline-flex items-center gap-1 rounded-full bg-red-weak py-1.5 pr-2 pl-3 text-[14px] font-semibold text-red"
           >
-            나를 차단했을 수 있는 사람도 {num(maybeBlocked)}명 있어요
+            차단 의심 계정 {num(maybeBlocked)}명도 함께 확인하세요
             <Icon name="chevron" size={15} />
           </button>
         )}
@@ -921,9 +921,9 @@ function Home({
           hint={lists.unfollowers.timeline ? '누가 언제 떠났는지까지 보여줘요' : undefined}
         />
         <MenuRow
-          def={lists['maybe-blocked']}
+          def={lists['blocked']}
           onOpen={go}
-          hint="서로 팔로우하다 양쪽에서 함께 사라졌어요"
+          hint="서로 팔로우하다 양쪽에서 동시에 사라졌어요"
         />
         <MenuRow def={lists['new-followers']} onOpen={go} last={!lists.renamed.users?.length} />
         {lists.renamed.users && lists.renamed.users.length > 0 && (
