@@ -687,9 +687,12 @@ function buildLists(
       users: left ? left.map((d) => d.user) : null,
       timeline,
       tags: unsure.size ? unsure : undefined,
-      footnote: unsure.size
-        ? '표시가 없는 계정은 언팔이 확실합니다. 내 팔로잉에 그대로 남아 있으니까요. ‘구분 불가’는 내가 팔로우하지 않던 계정이라 언팔인지 차단인지 가려낼 근거가 없는 경우예요.'
-        : undefined,
+      footnote:
+        '상대가 언팔한 경우가 대부분이지만, 계정이 삭제·비활성화·정지된 경우도 똑같이 보여요. ' +
+        '내보내기 파일에는 계정이 살아 있는지가 적혀 있지 않아서 둘을 가려낼 수 없어요. ' +
+        (unsure.size
+          ? '‘구분 불가’ 표시는 내가 팔로우하지 않던 계정이라, 차단일 가능성까지 섞여 있는 경우예요.'
+          : '아이디를 눌러 프로필이 열리는지 보면 확인할 수 있어요.'),
       csv: 'unfollog-나를-언팔한-사람',
       emptyTitle: '나를 언팔한 사람이 없어요',
       emptyBody: '저장된 스냅샷 사이에 떠난 팔로워가 한 명도 없어요.',
@@ -922,6 +925,10 @@ function Home({
         <h2 className="mb-2 px-1 text-[14px] font-semibold text-muted">지금 내 팔로우 관계</h2>
         <OneWayCard def={lists['not-following-back']} onOpen={go} />
         <StatRow defs={[lists.followers, lists.following, lists.mutual]} onOpen={go} />
+        <p className="ko mt-2 px-1 text-[12px] leading-[1.6] text-faint">
+          인스타그램 화면에 뜨는 숫자보다 많을 수 있어요. 내보내기 파일에는 삭제·정지된 계정도
+          그대로 남아 있는데, 인스타그램은 그런 계정을 빼고 세거든요.
+        </p>
       </section>
 
       <section className="mt-6">
