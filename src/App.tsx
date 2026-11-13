@@ -51,7 +51,6 @@ const VIEWS = [
   'following',
   'mutual',
   'not-following-back',
-  'not-followed-back',
   'snapshots',
 ] as const
 type View = (typeof VIEWS)[number]
@@ -77,6 +76,8 @@ type ListDef = {
   tags?: Map<string, string>
   /** 목록 위 안내문 */
   footnote?: string
+  /** 숫자만 나란히 보여줄 때 쓰는 짧은 이름 */
+  short?: string
   csv: string
   emptyTitle: string
   emptyBody: string
@@ -720,6 +721,7 @@ function buildLists(
     },
     followers: {
       view: 'followers',
+      short: '팔로워',
       label: '나를 팔로우하는 사람',
       description: '지금 나를 팔로우하고 있는 모든 계정이에요.',
       icon: 'users',
@@ -731,6 +733,7 @@ function buildLists(
     },
     following: {
       view: 'following',
+      short: '팔로잉',
       label: '내가 팔로우하는 사람',
       description: '지금 내가 팔로우하고 있는 모든 계정이에요.',
       icon: 'userCheck',
@@ -742,6 +745,7 @@ function buildLists(
     },
     mutual: {
       view: 'mutual',
+      short: '맞팔',
       label: '서로 팔로우하는 사람',
       description: '나도 팔로우하고, 상대도 나를 팔로우하는 계정이에요.',
       icon: 'swap',
@@ -761,17 +765,6 @@ function buildLists(
       csv: 'instafloww-나를-맞팔하지-않는-사람',
       emptyTitle: '모두 나를 맞팔하고 있어요',
       emptyBody: '내가 팔로우한 모든 계정이 나를 팔로우하고 있어요.',
-    },
-    'not-followed-back': {
-      view: 'not-followed-back',
-      label: '내가 맞팔하지 않는 사람',
-      description: '상대는 나를 팔로우하고 있지만, 내가 팔로우하지 않는 계정이에요.',
-      icon: 'user',
-      tone: 'neutral',
-      users: analysis.fans,
-      csv: 'instafloww-내가-맞팔하지-않는-사람',
-      emptyTitle: '모든 팔로워를 맞팔하고 있어요',
-      emptyBody: '나를 팔로우하는 모든 계정을 나도 팔로우하고 있어요.',
     },
   }
 }
@@ -938,13 +931,11 @@ function Home({
         )}
       </MenuGroup>
 
-      <MenuGroup title="지금 내 팔로우 관계">
-        <MenuRow def={lists.followers} onOpen={go} />
-        <MenuRow def={lists.following} onOpen={go} />
-        <MenuRow def={lists.mutual} onOpen={go} />
-        <MenuRow def={lists['not-following-back']} onOpen={go} hint="내가 팔로우하지만 상대는 안 해요" />
-        <MenuRow def={lists['not-followed-back']} onOpen={go} hint="상대는 팔로우하지만 나는 안 해요" last />
-      </MenuGroup>
+      <section className="mt-6">
+        <h2 className="mb-2 px-1 text-[14px] font-semibold text-muted">지금 내 팔로우 관계</h2>
+        <OneWayCard def={lists['not-following-back']} onOpen={go} />
+        <StatRow defs={[lists.followers, lists.following, lists.mutual]} onOpen={go} />
+      </section>
 
       <Card className="mt-3 px-2 py-1">
         <button
@@ -964,6 +955,53 @@ function Home({
         </button>
       </Card>
     </div>
+  )
+}
+
+/** 가장 강조하는 한 줄 — 내가 팔로우하지만 상대는 안 하는 계정 */
+function OneWayCard({ def, onOpen }: { def: ListDef; onOpen: (v: View) => void }) {
+  return (
+    <Card>
+      <button
+        onClick={() => onOpen(def.view)}
+        data-row={def.view}
+        className="block w-full rounded-[20px] px-5 py-5 text-left transition-colors hover:bg-sunken"
+      >
+        {/* 좁은 화면에서 제목과 숫자가 한 줄에서 서로를 밀지 않도록 줄을 나눕니다. */}
+        <span className="flex items-center gap-3.5">
+          <IconBadge icon={def.icon} tone="blue" />
+          <span className="ko min-w-0 flex-1 text-[16px] leading-[1.35] font-bold">{def.label}</span>
+          <Icon name="chevron" size={18} className="shrink-0 text-line-strong" />
+        </span>
+        <span className="tnum display mt-3.5 block text-[32px] leading-none font-bold" data-count>
+          {num(def.users?.length ?? 0)}명
+        </span>
+        <span className="ko mt-2 block text-[14px] leading-[1.45] text-muted">
+          내가 팔로우하지만 상대는 안 해요
+        </span>
+      </button>
+    </Card>
+  )
+}
+
+/** 인스타그램 프로필처럼 숫자만 나란히 — 눌러서 목록으로 들어갑니다 */
+function StatRow({ defs, onOpen }: { defs: ListDef[]; onOpen: (v: View) => void }) {
+  return (
+    <Card className="mt-3 flex p-1">
+      {defs.map((def) => (
+        <button
+          key={def.view}
+          onClick={() => onOpen(def.view)}
+          data-row={def.view}
+          className="min-w-0 flex-1 rounded-[17px] px-1 py-3.5 text-center transition-colors hover:bg-sunken"
+        >
+          <span className="tnum display block text-[21px] leading-tight font-bold" data-count>
+            {num(def.users?.length ?? 0)}
+          </span>
+          <span className="mt-1 block truncate text-[13px] text-muted">{def.short}</span>
+        </button>
+      ))}
+    </Card>
   )
 }
 
