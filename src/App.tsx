@@ -448,9 +448,9 @@ function Header({
       <div className="gutter mx-auto flex w-full max-w-[680px] items-center gap-2.5 py-3">
         <button onClick={onHome} className="flex min-w-0 flex-1 items-center gap-2.5" aria-label="처음 화면으로">
           <span className="brand-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] text-white">
-            <Icon name="logo" size={19} strokeWidth={2.4} />
+            <Icon name="logo" size={19} strokeWidth={3.4} />
           </span>
-          <span className="display truncate text-[18px] font-bold">Instafloww</span>
+          <span className="display truncate text-[18px] font-bold">언팔로그</span>
         </button>
         {hasData ? (
           <Dropzone onFiles={onFiles} busy={busy} compact />
@@ -569,7 +569,7 @@ function Landing({
         <div className="mt-5">
           <InfoBox icon="lock">
             “팔로워를 알려준다”면서 로그인을 요구하는 서비스는 비공식 접근이라, 계정이 정지되거나
-            탈취될 수 있어요. Instafloww는 계정 정보를 아예 받지 않아요.
+            탈취될 수 있어요. 언팔로그는 계정 정보를 아예 받지 않아요.
           </InfoBox>
         </div>
       </Card>
@@ -678,7 +678,7 @@ function buildLists(
       footnote: unsure.size
         ? '표시가 없는 계정은 언팔이 확실합니다. 내 팔로잉에 그대로 남아 있으니까요. ‘구분 불가’는 내가 팔로우하지 않던 계정이라 언팔인지 차단인지 가려낼 근거가 없는 경우예요.'
         : undefined,
-      csv: 'instafloww-나를-언팔한-사람',
+      csv: 'unfollog-나를-언팔한-사람',
       emptyTitle: '나를 언팔한 사람이 없어요',
       emptyBody: '저장된 스냅샷 사이에 떠난 팔로워가 한 명도 없어요.',
     },
@@ -694,7 +694,7 @@ function buildLists(
         trace && !trace.hasUnfollowLog
           ? `올린 파일에 ‘최근에 언팔한 계정’ 기록이 없어서, 내가 직접 언팔한 계정이 섞여 있을 수 있어요. ${howToCheck}`
           : howToCheck,
-      csv: 'instafloww-차단-의심-계정',
+      csv: 'unfollog-차단-의심-계정',
       emptyTitle: '차단 의심 계정이 없어요',
       emptyBody: '서로 팔로우하다가 양쪽 목록에서 함께 사라진 계정이 없어요.',
     },
@@ -707,7 +707,7 @@ function buildLists(
       tone: 'neutral',
       users: renames ? renames.map((r) => r.to) : null,
       notes: new Map((renames ?? []).map((r) => [r.to.username, `예전 아이디 @${r.from.display}`])),
-      csv: 'instafloww-아이디를-바꾼-사람',
+      csv: 'unfollog-아이디를-바꾼-사람',
       emptyTitle: '아이디를 바꾼 사람이 없어요',
       emptyBody: '팔로우 시각이 같은 옛 아이디·새 아이디 쌍이 없어요.',
     },
@@ -719,7 +719,7 @@ function buildLists(
       tone: 'green',
       // 아이디만 바꾼 계정은 새 팔로워가 아닙니다.
       users: comparison ? comparison.newFollowers.filter((u) => !renamedTo.has(u.username)) : null,
-      csv: 'instafloww-새로-나를-팔로우한-사람',
+      csv: 'unfollog-새로-나를-팔로우한-사람',
       emptyTitle: '새로 팔로우한 사람이 없어요',
       emptyBody: '두 스냅샷 사이에 새로 생긴 팔로워가 없어요.',
     },
@@ -731,7 +731,7 @@ function buildLists(
       icon: 'users',
       tone: 'brand',
       users: current.followers,
-      csv: 'instafloww-나를-팔로우하는-사람',
+      csv: 'unfollog-나를-팔로우하는-사람',
       emptyTitle: '나를 팔로우하는 사람이 없어요',
       emptyBody: '파일에 팔로워 목록이 들어 있지 않았어요. followers 파일도 함께 올려 주세요.',
     },
@@ -743,7 +743,7 @@ function buildLists(
       icon: 'userCheck',
       tone: 'brand',
       users: current.following,
-      csv: 'instafloww-내가-팔로우하는-사람',
+      csv: 'unfollog-내가-팔로우하는-사람',
       emptyTitle: '내가 팔로우하는 사람이 없어요',
       emptyBody: '파일에 팔로잉 목록이 들어 있지 않았어요. following 파일도 함께 올려 주세요.',
     },
@@ -755,7 +755,7 @@ function buildLists(
       icon: 'swap',
       tone: 'brand',
       users: analysis.mutual,
-      csv: 'instafloww-서로-팔로우하는-사람',
+      csv: 'unfollog-서로-팔로우하는-사람',
       emptyTitle: '서로 팔로우하는 사람이 없어요',
       emptyBody: '팔로워와 팔로잉에 겹치는 계정이 없어요.',
     },
@@ -766,7 +766,7 @@ function buildLists(
       icon: 'userX',
       tone: 'neutral',
       users: analysis.notFollowingBack,
-      csv: 'instafloww-나를-맞팔하지-않는-사람',
+      csv: 'unfollog-나를-맞팔하지-않는-사람',
       emptyTitle: '모두 나를 맞팔하고 있어요',
       emptyBody: '내가 팔로우한 모든 계정이 나를 팔로우하고 있어요.',
     },
@@ -1167,7 +1167,7 @@ function Footer() {
   return (
     <footer className="gutter mx-auto w-full max-w-[680px] pb-12">
       <p className="ko text-[13px] leading-[1.7] text-faint">
-        Instafloww는 인스타그램 공식 데이터 내보내기 파일만 사용해요. 계정 로그인 정보를 요구하지
+        언팔로그는 인스타그램 공식 데이터 내보내기 파일만 사용해요. 계정 로그인 정보를 요구하지
         않고, 분석 결과를 어디에도 전송하지 않아요. 저장된 스냅샷은 이 브라우저에만 있어서,
         브라우저 데이터를 지우면 함께 사라져요.
       </p>

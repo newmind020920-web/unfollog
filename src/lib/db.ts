@@ -8,6 +8,7 @@ import type { Snapshot, SnapshotMeta } from '../types'
  * 그때는 메모리에만 담아 두고 앱은 그대로 동작하게 합니다.
  */
 
+// 서비스 이름이 바뀌어도 그대로 둡니다. 바꾸면 이미 저장된 스냅샷을 찾지 못합니다.
 const DB_NAME = 'instafloww'
 const DB_VERSION = 1
 const STORE_FULL = 'snapshots'

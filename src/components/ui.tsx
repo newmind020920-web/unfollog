@@ -123,7 +123,8 @@ const PERSON = (
 )
 
 const PATHS: Record<IconName, ReactNode> = {
-  logo: <path d="M6 18L18 6M18 6v8M18 6h-8" />,
+  // 끊긴 고리 — 이어져 있던 팔로우가 한 곳 끊어진 모양
+  logo: <path d="M16.8 6.25A7.5 7.5 0 1 1 7.2 6.25" />,
   upload: (
     <>
       <path d="M12 16.5V4.5m0 0L7.5 9M12 4.5L16.5 9" />

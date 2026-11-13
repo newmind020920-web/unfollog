@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const outDir = resolve(process.argv[2] ?? 'dist-artifact')
-const buildDir = mkdtempSync(join(tmpdir(), 'instafloww-artifact-'))
+const buildDir = mkdtempSync(join(tmpdir(), 'unfollog-artifact-'))
 
 execFileSync('npx', ['vite', 'build', '--outDir', buildDir, '--emptyOutDir', '--logLevel', 'warn'], {
   stdio: 'inherit',
@@ -35,7 +35,7 @@ const js = readFileSync(join(assets, jsFile), 'utf8')
 if (/<\/script/i.test(js)) throw new Error('번들 안에 </script 가 있어 그대로 넣을 수 없습니다.')
 
 // 호스트가 <html>/<head>/<body> 를 감싸 주므로 내용만 씁니다.
-const html = `<title>Instafloww</title>
+const html = `<title>언팔로그</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>${css}</style>
 <div id="root"></div>

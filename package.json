@@ -1,5 +1,5 @@
 {
-  "name": "instafloww",
+  "name": "unfollog",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "test": "esbuild test/run.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/instafloww-test.mjs --log-level=error && node node_modules/.cache/instafloww-test.mjs",
+    "test": "esbuild test/run.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/unfollog-test.mjs --log-level=error && node node_modules/.cache/unfollog-test.mjs",
     "build:artifact": "node scripts/build-artifact.mjs"
   },
   "dependencies": {
