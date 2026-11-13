@@ -21,7 +21,8 @@ import {
 } from './lib/db'
 import { parseFiles } from './lib/parse'
 import { AnalyzeProgress, type Progress, type Step } from './components/Progress'
-import { buildSampleSnapshots } from './lib/sample'
+import { buildReminderIcs, daysFromNow } from './lib/reminder'
+import { download } from './lib/export'
 import { Dropzone } from './components/Dropzone'
 import { Guide } from './components/Guide'
 import { SnapshotPanel } from './components/SnapshotPanel'
@@ -281,11 +282,6 @@ export default function App() {
     }
   }, [refresh])
 
-  const removeSamples = useCallback(async () => {
-    const list = await listSnapshots()
-    for (const m of list) if (m.sample) await deleteSnapshot(m.id)
-  }, [])
-
   const handleFiles = useCallback(
     async (files: File[]) => {
       setBusy(true)
@@ -320,8 +316,6 @@ export default function App() {
         counts.following = result.following.length
         await show('comparing')
 
-        // 샘플과 실제 데이터를 비교하면 의미 없는 결과가 나오므로 샘플은 먼저 치웁니다.
-        await removeSamples()
         await show('saving')
 
         const createdAt = Date.now()
@@ -377,27 +371,8 @@ export default function App() {
         setProgress(null)
       }
     },
-    [go, refresh, removeSamples],
+    [go, refresh],
   )
-
-  const handleSample = useCallback(async () => {
-    setBusy(true)
-    setNotice(null)
-    setWarnings([])
-    try {
-      const samples = buildSampleSnapshots(Date.now())
-      for (const snapshot of samples) await putSnapshot(snapshot)
-      await refresh(samples[samples.length - 1].id)
-      go('home')
-    } catch (err) {
-      setNotice({
-        tone: 'red',
-        text: err instanceof Error ? err.message : '샘플을 불러오지 못했어요.',
-      })
-    } finally {
-      setBusy(false)
-    }
-  }, [go, refresh])
 
   const analysis = useMemo(() => (current ? analyze(current) : null), [current])
   const comparison = useMemo(
@@ -428,7 +403,7 @@ export default function App() {
             <AnalyzeProgress progress={progress} />
           </div>
         ) : !hasData ? (
-          <Landing busy={busy} onFiles={handleFiles} onSample={handleSample} />
+          <Landing busy={busy} onFiles={handleFiles} />
         ) : (
           <Workspace
             view={view}
@@ -441,11 +416,6 @@ export default function App() {
             trace={trace}
             metas={metas}
             persistent={persistent}
-            onRemoveSamples={async () => {
-              await removeSamples()
-              await refresh()
-              go('home')
-            }}
             onPickCurrent={async (id) => {
               await selectPair(metas, id)
             }}
@@ -558,15 +528,7 @@ function WarningBox({ warnings }: { warnings: string[] }) {
 
 /* ───────────────────────── 처음 화면 ───────────────────────── */
 
-function Landing({
-  busy,
-  onFiles,
-  onSample,
-}: {
-  busy: boolean
-  onFiles: (files: File[]) => void
-  onSample: () => void
-}) {
+function Landing({ busy, onFiles }: { busy: boolean; onFiles: (files: File[]) => void }) {
   return (
     <div className="pt-10 sm:pt-14">
       <div className="text-center">
@@ -585,30 +547,20 @@ function Landing({
         <Dropzone onFiles={onFiles} busy={busy} />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-card px-5 py-4 shadow-card">
-        <div className="min-w-0">
-          <p className="text-[16px] font-bold">파일이 아직 없나요?</p>
-          <p className="ko mt-0.5 text-[14px] text-muted">샘플 데이터로 화면을 먼저 둘러볼 수 있어요.</p>
-        </div>
-        <Button onClick={onSample} disabled={busy}>
-          샘플로 체험하기
-        </Button>
-      </div>
-
-      <Card className="mt-3 px-5 py-2">
-        <ul>
-          <PreviewRow icon="userMinus" tone="red" label="나를 언팔한 사람" body="누가, 대략 언제 떠났는지 찾아요" />
-          <PreviewRow icon="ban" tone="red" label="차단 의심 계정" body="서로 팔로우하다 양쪽에서 동시에 사라진 계정" />
-          <PreviewRow icon="userX" tone="neutral" label="나를 맞팔하지 않는 사람" body="내가 팔로우하지만 상대는 안 하는 계정" last />
-        </ul>
-      </Card>
-
       <Card className="mt-3 p-5 sm:p-7">
         <h2 className="display text-[20px] font-bold">데이터 내보내는 방법</h2>
         <p className="ko mt-1.5 mb-7 text-[15px] text-muted">
-          처음 한 번만 하면 돼요. 보통 몇 분 안에 받을 수 있어요.
+          파일이 없다면 여기부터. 처음 한 번만 하면 되고, 보통 몇 분 안에 받을 수 있어요.
         </p>
         <Guide />
+      </Card>
+
+      <Card className="mt-3 px-5 py-2">
+        <ul>
+          <PreviewRow icon="userX" tone="brand" label="나를 맞팔하지 않는 사람" body="파일 하나만 올려도 바로 나와요" />
+          <PreviewRow icon="userMinus" tone="red" label="나를 언팔한 사람" body="누가, 대략 언제 떠났는지 찾아요" />
+          <PreviewRow icon="ban" tone="red" label="차단 의심 계정" body="서로 팔로우하다 양쪽에서 동시에 사라진 계정" last />
+        </ul>
       </Card>
 
       <Card className="mt-3 p-5 sm:p-7">
@@ -686,7 +638,6 @@ type WorkspaceProps = {
   trace: DepartureTrace | null
   metas: SnapshotMeta[]
   persistent: boolean
-  onRemoveSamples: () => void
   onPickCurrent: (id: string) => void
   onPickBaseline: (id: string | null) => void
   onDelete: (id: string) => void
@@ -900,7 +851,6 @@ function Home({
   trace,
   metas,
   persistent,
-  onRemoveSamples,
   lists,
 }: WorkspaceProps & { lists: Record<ListView, ListDef> }) {
   const unfollowed = lists.unfollowers.users?.length ?? null
@@ -912,17 +862,6 @@ function Home({
 
   return (
     <div className="pt-4">
-      {current.sample && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-brand-weak px-4 py-3.5">
-          <p className="ko min-w-0 flex-1 text-[14px] leading-[1.55] font-medium text-brand">
-            샘플 데이터를 보고 있어요. 실제 계정 정보가 아니에요.
-          </p>
-          <Button size="sm" variant="card" onClick={onRemoveSamples}>
-            샘플 지우기
-          </Button>
-        </div>
-      )}
-
       {/* 한 문장으로 먼저 답합니다 */}
       <div className="px-1 pt-5 pb-7">
         <h1 className="display text-[28px] leading-[1.35] font-bold sm:text-[32px]" data-headline>
@@ -976,27 +915,36 @@ function Home({
         )}
       </div>
 
-      <MenuGroup title="지난번과 달라진 것">
-        <MenuRow
-          def={lists.unfollowers}
-          onOpen={go}
-          hint={lists.unfollowers.timeline ? '누가 언제 떠났는지까지 보여줘요' : undefined}
-        />
-        <MenuRow
-          def={lists['blocked']}
-          onOpen={go}
-          hint="서로 팔로우하다 양쪽에서 동시에 사라졌어요"
-        />
-        <MenuRow def={lists['new-followers']} onOpen={go} last={!lists.renamed.users?.length} />
-        {lists.renamed.users && lists.renamed.users.length > 0 && (
-          <MenuRow def={lists.renamed} onOpen={go} hint="언팔이 아니라 아이디만 바뀌었어요" last />
-        )}
-      </MenuGroup>
-
-      <section className="mt-6">
+      <section>
         <h2 className="mb-2 px-1 text-[14px] font-semibold text-muted">지금 내 팔로우 관계</h2>
         <OneWayCard def={lists['not-following-back']} onOpen={go} />
         <StatRow defs={[lists.followers, lists.following, lists.mutual]} onOpen={go} />
+      </section>
+
+      <section className="mt-6">
+        <h2 className="mb-2 px-1 text-[14px] font-semibold text-muted">지난번과 달라진 것</h2>
+        {comparison ? (
+          <Card className="px-2 py-1">
+            <ul>
+              <MenuRow
+                def={lists.unfollowers}
+                onOpen={go}
+                hint={lists.unfollowers.timeline ? '누가 언제 떠났는지까지 보여줘요' : undefined}
+              />
+              <MenuRow
+                def={lists['blocked']}
+                onOpen={go}
+                hint="서로 팔로우하다 양쪽에서 동시에 사라졌어요"
+              />
+              <MenuRow def={lists['new-followers']} onOpen={go} last={!lists.renamed.users?.length} />
+              {lists.renamed.users && lists.renamed.users.length > 0 && (
+                <MenuRow def={lists.renamed} onOpen={go} hint="언팔이 아니라 아이디만 바뀌었어요" last />
+              )}
+            </ul>
+          </Card>
+        ) : (
+          <FirstRecordCard />
+        )}
       </section>
 
       <Card className="mt-3 px-2 py-1">
@@ -1067,14 +1015,74 @@ function StatRow({ defs, onOpen }: { defs: ListDef[]; onOpen: (v: View) => void 
   )
 }
 
-function MenuGroup({ title, children }: { title: string; children: ReactNode }) {
+/** 링크로 여는 미리보기에서는 파일 저장이 막혀 있어 알림 버튼을 숨깁니다. */
+const CAN_DOWNLOAD = !import.meta.env.VITE_ARTIFACT
+
+const REMIND_OPTIONS = [
+  { days: 7, label: '1주 뒤' },
+  { days: 14, label: '2주 뒤' },
+  { days: 30, label: '한 달 뒤' },
+]
+
+/**
+ * 스냅샷이 하나뿐일 때. 비교할 것이 없다는 사실을 설명하고,
+ * 다음에 올릴 시점을 캘린더에 걸어 둘 수 있게 합니다.
+ */
+function FirstRecordCard() {
+  const [booked, setBooked] = useState<number | null>(null)
+
+  function remind(days: number) {
+    const when = daysFromNow(days)
+    // 캘린더 파일 이름은 영문으로 둡니다. 한글 이름을 못 다루는 캘린더 앱이 있습니다.
+    const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`
+    download(
+      `unfollog-reminder-${stamp}.ics`,
+      buildReminderIcs(when, window.location.href),
+      'text/calendar;charset=utf-8',
+    )
+    setBooked(days)
+  }
+
   return (
-    <section className="mt-3">
-      <Card className="px-2 pt-4 pb-1">
-        <h2 className="px-3 pb-1 text-[14px] font-semibold text-muted">{title}</h2>
-        <ul>{children}</ul>
-      </Card>
-    </section>
+    <Card className="p-5 sm:p-6" data-first-record>
+      <div className="flex items-center gap-3.5">
+        <IconBadge icon="clock" tone="brand" />
+        <div className="min-w-0">
+          <p className="ko text-[17px] leading-[1.35] font-bold">오늘이 첫 기록이에요</p>
+          <p className="ko mt-1 text-[14px] leading-[1.5] text-muted">아직 비교할 대상이 없어요</p>
+        </div>
+      </div>
+
+      <p className="ko mt-4 text-[15px] leading-[1.7] text-muted">
+        인스타그램은 <b className="font-semibold text-fg-2">지금</b> 팔로워가 누구인지만 알려줘요.
+        오늘 목록을 저장해 뒀으니, 다음에 한 번 더 올리면 그사이에{' '}
+        <b className="font-semibold text-fg-2">누가 떠났는지, 누가 차단했는지</b> 알려드릴게요.
+      </p>
+
+      {CAN_DOWNLOAD && (
+        <div className="mt-5 rounded-2xl bg-sunken p-4">
+          <p className="ko text-[15px] font-semibold">잊지 않게 알림을 걸어둘까요?</p>
+          <div className="mt-3 flex flex-wrap gap-2" data-remind>
+            {REMIND_OPTIONS.map((o) => (
+              <Button
+                key={o.days}
+                size="sm"
+                variant={booked === o.days ? 'primary' : 'card'}
+                onClick={() => remind(o.days)}
+              >
+                {booked === o.days ? <Icon name="check" size={15} /> : null}
+                {o.label}
+              </Button>
+            ))}
+          </div>
+          <p className="ko mt-3 text-[13px] leading-[1.55] text-faint">
+            {booked === null
+              ? '휴대폰 캘린더에 일정으로 추가돼요. 전화번호를 받지 않아요.'
+              : '내려받은 파일을 열면 캘린더에 들어가요. 그날 아침에 알림이 울려요.'}
+          </p>
+        </div>
+      )}
+    </Card>
   )
 }
 

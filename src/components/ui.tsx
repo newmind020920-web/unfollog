@@ -1,11 +1,20 @@
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 
 export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ')
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx('rounded-[20px] bg-card shadow-card', className)}>{children}</div>
+/** 보통의 div 처럼 동작합니다 — data-* 같은 속성도 그대로 넘어갑니다. */
+export function Card({
+  children,
+  className,
+  ...rest
+}: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cx('rounded-[20px] bg-card shadow-card', className)} {...rest}>
+      {children}
+    </div>
+  )
 }
 
 export function Button({
@@ -259,7 +268,11 @@ export function formatAgo(ms: number, now = Date.now()) {
 export function formatSpan(from: number, to: number): { text: string; sameDay: boolean } {
   const a = new Date(from)
   const b = new Date(to)
-  if (a.toDateString() === b.toDateString()) return { text: formatDay(to), sameDay: true }
+  if (a.toDateString() === b.toDateString()) {
+    // 같은 날이면 날짜만으로는 구간이 구분되지 않아 시각까지 보여줍니다.
+    const hm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return { text: `${formatDay(to)} ${hm(a)}~${hm(b)}`, sameDay: true }
+  }
   if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()) {
     return { text: `${a.getMonth() + 1}월 ${a.getDate()}~${b.getDate()}일`, sameDay: false }
   }

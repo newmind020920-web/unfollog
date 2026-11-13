@@ -43,6 +43,12 @@ export function download(filename: string, content: string, mime = 'text/csv;cha
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  a.rel = 'noopener'
+  // 문서에 붙이지 않으면 브라우저가 download 속성을 무시해 파일 이름이 사라집니다.
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  a.remove()
+  // 곧바로 거두면 저장이 시작되기 전에 주소가 사라질 수 있습니다.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
