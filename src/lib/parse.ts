@@ -28,6 +28,13 @@ function basename(path: string) {
   return path.split(/[\\/]/).pop() ?? path
 }
 
+/** 읽는 동안 지금 뭘 하는지 알려줍니다. */
+export type ParseStep = {
+  stage: 'opening' | 'followers' | 'following'
+  /** 지금까지 읽은 사람 수 */
+  count: number
+}
+
 export type FileKind = 'followers' | 'following' | 'unfollowedByMe' | 'blockedByMe' | null
 
 export function classifyFileName(path: string): FileKind {
@@ -227,6 +234,7 @@ type Collected = {
   blockedByMe?: Map<string, IgUser>
   sources: ParseResult['sources']
   warnings: string[]
+  report?: (step: ParseStep) => Promise<void> | void
 }
 
 function merge(target: Map<string, IgUser>, users: IgUser[]) {
@@ -240,7 +248,7 @@ function merge(target: Map<string, IgUser>, users: IgUser[]) {
   }
 }
 
-function absorb(c: Collected, path: string, text: string) {
+async function absorb(c: Collected, path: string, text: string) {
   const declared = classifyFileName(path)
   const { users, kind } = parseText(text, path, declared)
 
@@ -257,8 +265,10 @@ function absorb(c: Collected, path: string, text: string) {
 
   if (kind === 'followers') {
     merge(c.followers, users)
+    await c.report?.({ stage: 'followers', count: c.followers.size })
   } else if (kind === 'following') {
     merge(c.following, users)
+    await c.report?.({ stage: 'following', count: c.following.size })
   } else {
     c.warnings.push(`${basename(path)}: 팔로워/팔로잉 중 무엇인지 알 수 없어 건너뛰었습니다.`)
     return
@@ -267,6 +277,7 @@ function absorb(c: Collected, path: string, text: string) {
 }
 
 async function absorbZip(c: Collected, file: File) {
+  await c.report?.({ stage: 'opening', count: 0 })
   let index: ZipEntry[]
   try {
     index = await readZipIndex(file)
@@ -295,7 +306,7 @@ async function absorbZip(c: Collected, file: File) {
   for (const entry of chosen) {
     try {
       const text = await readZipEntryText(file, entry)
-      absorb(c, entry.name, text)
+      await absorb(c, entry.name, text)
     } catch (err) {
       c.warnings.push(
         `${basename(entry.name)}: ${err instanceof Error ? err.message : '읽기 실패'}`,
@@ -308,13 +319,22 @@ function isZip(file: File) {
   return /\.zip$/i.test(file.name) || file.type === 'application/zip'
 }
 
-/** 사용자가 올린 파일들에서 팔로워/팔로잉 목록을 뽑아냅니다. */
-export async function parseFiles(files: File[]): Promise<ParseResult> {
+/**
+ * 사용자가 올린 파일들에서 팔로워/팔로잉 목록을 뽑아냅니다.
+ *
+ * @param report 단계마다 불립니다. 돌려준 약속을 기다리므로, 화면이
+ *   각 단계를 읽을 수 있을 만큼 머물게 할 수 있습니다.
+ */
+export async function parseFiles(
+  files: File[],
+  report?: (step: ParseStep) => Promise<void> | void,
+): Promise<ParseResult> {
   const c: Collected = {
     followers: new Map(),
     following: new Map(),
     sources: [],
     warnings: [],
+    report,
   }
 
   for (const file of files) {
@@ -322,7 +342,8 @@ export async function parseFiles(files: File[]): Promise<ParseResult> {
       if (isZip(file)) {
         await absorbZip(c, file)
       } else if (/\.(json|html?)$/i.test(file.name)) {
-        absorb(c, file.name, await file.text())
+        await c.report?.({ stage: 'opening', count: 0 })
+        await absorb(c, file.name, await file.text())
       } else {
         c.warnings.push(`${file.name}: zip / json / html 파일만 읽을 수 있습니다.`)
       }

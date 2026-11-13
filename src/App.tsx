@@ -20,6 +20,7 @@ import {
   renameSnapshot,
 } from './lib/db'
 import { parseFiles } from './lib/parse'
+import { AnalyzeProgress, type Progress, type Step } from './components/Progress'
 import { buildSampleSnapshots } from './lib/sample'
 import { Dropzone } from './components/Dropzone'
 import { Guide } from './components/Guide'
@@ -148,6 +149,22 @@ function newSnapshotLabel(createdAt: number, existing: SnapshotMeta[]) {
 const num = (n: number) => n.toLocaleString('ko-KR')
 
 /**
+ * 분석은 보통 눈 깜짝할 사이에 끝납니다. 그대로 두면 무엇을 읽었는지
+ * 보이지 않고 결과만 튀어나와서, 제대로 처리됐는지 믿기 어렵습니다.
+ * 그래서 각 단계가 읽힐 만큼만 머물게 합니다. 단계 자체는 실제로 하는 일입니다.
+ */
+const MIN_STEP_MS = 420
+
+function createPacer(minMs: number) {
+  let last = performance.now()
+  return async () => {
+    const remaining = minMs - (performance.now() - last)
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining))
+    last = performance.now()
+  }
+}
+
+/**
  * "3일 전쯤 · 11월 5~12일 사이" — 떠난 시점은 두 스냅샷 사이 구간으로만 알 수 있으므로,
  * 구간의 가운데를 어림값으로 쓰고 구간 자체를 같이 보여줍니다.
  */
@@ -176,6 +193,7 @@ export default function App() {
   const [trace, setTrace] = useState<DepartureTrace | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<Progress | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
   const [warnings, setWarnings] = useState<string[]>([])
   const [persistent, setPersistent] = useState(true)
@@ -273,8 +291,20 @@ export default function App() {
       setBusy(true)
       setNotice(null)
       setWarnings([])
+
+      const pace = createPacer(MIN_STEP_MS)
+      const counts = { followers: 0, following: 0 }
+      const show = async (step: Step) => {
+        setProgress({ step, ...counts })
+        await pace()
+      }
+
       try {
-        const result = await parseFiles(files)
+        const result = await parseFiles(files, async ({ stage, count }) => {
+          if (stage === 'followers') counts.followers = count
+          if (stage === 'following') counts.following = count
+          await show(stage)
+        })
         setWarnings(result.warnings)
 
         if (!result.followers.length && !result.following.length) {
@@ -286,8 +316,13 @@ export default function App() {
           return
         }
 
+        counts.followers = result.followers.length
+        counts.following = result.following.length
+        await show('comparing')
+
         // 샘플과 실제 데이터를 비교하면 의미 없는 결과가 나오므로 샘플은 먼저 치웁니다.
         await removeSamples()
+        await show('saving')
 
         const createdAt = Date.now()
         const existing = await listSnapshots()
@@ -339,6 +374,7 @@ export default function App() {
         })
       } finally {
         setBusy(false)
+        setProgress(null)
       }
     },
     [go, refresh, removeSamples],
@@ -387,7 +423,11 @@ export default function App() {
         {notice && <NoticeBar notice={notice} onDismiss={() => setNotice(null)} />}
         {warnings.length > 0 && <WarningBox warnings={warnings} />}
 
-        {!hasData ? (
+        {progress ? (
+          <div className="pt-6">
+            <AnalyzeProgress progress={progress} />
+          </div>
+        ) : !hasData ? (
           <Landing busy={busy} onFiles={handleFiles} onSample={handleSample} />
         ) : (
           <Workspace
