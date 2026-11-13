@@ -1,4 +1,4 @@
-import { parseFiles } from '../src/lib/parse'
+import { parseFiles, parseExportDate } from '../src/lib/parse'
 import { analyze, compare, departureTracker } from '../src/lib/analyze'
 import type { Snapshot } from '../src/types'
 import { buildZip, followersJson, followingJson, pendingJson } from './fixture'
@@ -300,6 +300,42 @@ async function main() {
     ])
     eq('title 과 /_u/ 주소에서 아이디를 읽음', r.following.map((u) => u.username), ['new.format', 'titleonly'])
     eq('팔로우 시각 유지', r.following[0].followedAt, 1700000000)
+  }
+
+  console.log('\nHTML 내보내기의 날짜 글자 읽기')
+  {
+    const at = parseExportDate('11월 10, 2026 8:31 오후')
+    const d = at !== undefined ? new Date(at * 1000) : undefined
+    eq('한국어 오후', d && [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes()],
+       [2026, 11, 10, 20, 31])
+    const am = parseExportDate('1월 3, 2025 12:05 오전')
+    const dam = am !== undefined ? new Date(am * 1000) : undefined
+    eq('한국어 오전 12시는 0시', dam && [dam.getMonth() + 1, dam.getDate(), dam.getHours()], [1, 3, 0])
+    const noon = parseExportDate('6월 7, 2024 12:00 오후')
+    const dn = noon !== undefined ? new Date(noon * 1000) : undefined
+    eq('한국어 오후 12시는 12시', dn && dn.getHours(), 12)
+    check('영어 표기도 읽음', parseExportDate('Nov 10, 2026 8:31 PM') !== undefined)
+    eq('날짜가 아니면 undefined', parseExportDate('팔로워 및 팔로잉'), undefined)
+    eq('빈 글자도 undefined', parseExportDate('  '), undefined)
+  }
+
+  console.log('\nvalue 에 주소 전체가 들어 있는 내보내기')
+  {
+    // 같은 사람을 한쪽은 아이디로, 한쪽은 주소로 적는 내보내기가 있습니다.
+    // 주소에서 아이디를 뽑지 않으면 두 목록이 하나도 안 겹칩니다.
+    const r = await parseFiles([
+      new File([JSON.stringify([
+        { title: '', media_list_data: [], string_list_data: [{ href: 'https://www.instagram.com/same_person', value: 'same_person', timestamp: 10 }] },
+      ])], 'followers_1.json'),
+      new File([JSON.stringify({ relationships_following: [
+        { title: '', media_list_data: [], string_list_data: [{ href: 'https://www.instagram.com/_u/same_person', value: 'https://www.instagram.com/_u/same_person', timestamp: 10 }] },
+      ] })], 'following.json'),
+    ])
+    eq('팔로워 아이디', r.followers.map((u) => u.username), ['same_person'])
+    eq('팔로잉도 같은 아이디로 읽힘', r.following.map((u) => u.username), ['same_person'])
+    const a = analyze({ id: 's', createdAt: 1, label: 'l', ...r })
+    eq('맞팔로 잡힘', a.mutual.map((u) => u.username), ['same_person'])
+    eq('짝사랑 없음', a.notFollowingBack.length, 0)
   }
 
   console.log('\n대소문자/비프로필 링크 처리')

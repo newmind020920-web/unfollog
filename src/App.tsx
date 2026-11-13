@@ -304,15 +304,33 @@ export default function App() {
         await putSnapshot(snapshot)
         await refresh(snapshot.id)
 
+        // 양쪽 다 많은데 겹치는 사람이 하나도 없으면 파일을 잘못 읽었을 가능성이 큽니다.
+        // 숫자는 그럴듯해 보여도 전부 틀리므로 조용히 넘어가면 안 됩니다.
+        // 다만 막지는 않습니다 — 맞팔이 정말 없는 계정도 있습니다.
+        const followerKeys = new Set(result.followers.map((u) => u.username))
+        const noOverlap =
+          result.followers.length >= 10 &&
+          result.following.length >= 10 &&
+          !result.following.some((u) => followerKeys.has(u.username))
+
         const prevNewest = existing[0]
-        setNotice({
-          tone: 'green',
-          text: prevNewest
-            ? `저장했어요. ‘${prevNewest.label}’ 스냅샷과 비교한 결과예요.`
-            : `저장했어요. 팔로워 ${num(result.followers.length)}명, 팔로잉 ${num(
-                result.following.length,
-              )}명을 읽었어요.`,
-        })
+        setNotice(
+          noOverlap
+            ? {
+                tone: 'red',
+                text:
+                  '저장은 했지만, 팔로워와 팔로잉에 겹치는 사람이 한 명도 없어요. ' +
+                  '파일을 제대로 읽지 못했을 수 있어요. 내보내기를 JSON 형식으로 다시 받아서 올려보세요.',
+              }
+            : {
+                tone: 'green',
+                text: prevNewest
+                  ? `저장했어요. ‘${prevNewest.label}’ 스냅샷과 비교한 결과예요.`
+                  : `저장했어요. 팔로워 ${num(result.followers.length)}명, 팔로잉 ${num(
+                      result.following.length,
+                    )}명을 읽었어요.`,
+              },
+        )
         go('home')
       } catch (err) {
         setNotice({

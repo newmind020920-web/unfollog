@@ -106,9 +106,12 @@ function collectFromJson(node: unknown, out: Map<string, IgUser>, depth = 0) {
       if (!raw || typeof raw !== 'object') continue
       const item = raw as Record<string, unknown>
       const href = typeof item.href === 'string' ? item.href : ''
-      const value = typeof item.value === 'string' ? item.value : ''
-      // 형식에 따라 아이디가 value, 주소, title 중 한 곳에만 들어 있습니다.
-      const name = value || (href ? usernameFromHref(href) ?? '' : '') || title
+      const value = typeof item.value === 'string' ? item.value.trim() : ''
+      // 주소에서 뽑은 아이디를 가장 믿습니다. value 에 주소 전체가 들어 있는
+      // 내보내기가 있어서, value 를 먼저 쓰면 같은 사람이 다른 이름이 됩니다.
+      const fromHref = href ? (usernameFromHref(href) ?? '') : ''
+      const fromValue = value.startsWith('http') ? (usernameFromHref(value) ?? '') : value
+      const name = fromHref || fromValue || title
       if (name) pushUser(out, name, href, item.timestamp)
     }
     // title 에만 이름이 있고 string_list_data 가 빈 경우
@@ -121,14 +124,73 @@ function collectFromJson(node: unknown, out: Map<string, IgUser>, depth = 0) {
   for (const child of Object.values(obj)) collectFromJson(child, out, depth + 1)
 }
 
+/**
+ * HTML 내보내기의 날짜 글자를 시각으로 바꿉니다.
+ *
+ *   한국어: "11월 10, 2026 8:31 오후"
+ *   영어:   "Nov 10, 2026 8:31 pm"
+ *
+ * 파일에 적힌 날짜를 그대로 보여주려고 시간대를 옮기지 않습니다.
+ * 인스타그램은 이 시각에 "UTC" 라고 적어 두지만 실제로는 다른 시간대로
+ * 적는 경우가 있어서, 변환하면 오히려 하루가 밀려 보입니다.
+ * 스냅샷끼리는 같은 기준으로 비교되므로 분석 결과에는 영향이 없습니다.
+ */
+export function parseExportDate(text: string): number | undefined {
+  const trimmed = text.trim()
+
+  const ko = trimmed.match(
+    /(\d{1,2})월\s*(\d{1,2}),\s*(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(오전|오후)/,
+  )
+  if (ko) {
+    const [, month, day, year, hour, minute, second, meridiem] = ko
+    let h = Number(hour) % 12
+    if (meridiem === '오후') h += 12
+    const d = new Date(
+      Number(year), Number(month) - 1, Number(day), h, Number(minute), Number(second ?? 0),
+    )
+    return Number.isNaN(d.getTime()) ? undefined : Math.floor(d.getTime() / 1000)
+  }
+
+  // 영어 등 다른 언어는 브라우저의 날짜 해석에 맡깁니다.
+  if (/\d{4}/.test(trimmed)) {
+    const parsed = Date.parse(trimmed)
+    if (!Number.isNaN(parsed)) return Math.floor(parsed / 1000)
+  }
+  return undefined
+}
+
+/**
+ * 링크 옆에 붙어 있는 날짜를 찾습니다. 내보내기는 이런 모양입니다.
+ *
+ *   <div>
+ *     <div><a href="...">...</a></div>
+ *     <div>11월 10, 2026 8:31 오후</div>
+ *   </div>
+ */
+function dateNearAnchor(anchor: Element): number | undefined {
+  let node: Element | null = anchor
+  // 링크 자신과 그 부모까지 올라가며 바로 다음 칸을 살핍니다.
+  for (let depth = 0; depth < 3 && node; depth++) {
+    const sibling = node.nextElementSibling
+    const text = sibling?.textContent?.trim()
+    if (text) {
+      const at = parseExportDate(text)
+      if (at !== undefined) return at
+    }
+    node = node.parentElement
+  }
+  return undefined
+}
+
 function collectFromHtml(html: string, out: Map<string, IgUser>) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   for (const anchor of Array.from(doc.querySelectorAll('a[href]'))) {
     const href = anchor.getAttribute('href') ?? ''
+    // 아이디는 반드시 주소에서 뽑습니다. 링크 글자는 파일마다 달라서
+    // (팔로워는 아이디, 팔로잉은 주소 전체) 그대로 쓰면 서로 안 맞습니다.
     const username = usernameFromHref(href)
     if (!username) continue
-    const label = (anchor.textContent ?? '').trim()
-    pushUser(out, label || username, href)
+    pushUser(out, username, href, dateNearAnchor(anchor))
   }
 }
 
