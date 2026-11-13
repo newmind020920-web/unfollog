@@ -35,6 +35,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+        env:
+          # 저장소 Settings → Secrets and variables → Actions → Variables 에
+          # VITE_API_URL 을 넣으면 방문 집계가 켜집니다. 없으면 아무것도 보내지 않습니다.
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true

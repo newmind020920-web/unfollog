@@ -23,6 +23,7 @@ import { parseFiles } from './lib/parse'
 import { AnalyzeProgress, type Progress, type Step } from './components/Progress'
 import { buildReminderIcs, daysFromNow } from './lib/reminder'
 import { download } from './lib/export'
+import { ping } from './lib/visit'
 import { Dropzone } from './components/Dropzone'
 import { Guide } from './components/Guide'
 import { SnapshotPanel } from './components/SnapshotPanel'
@@ -263,7 +264,8 @@ export default function App() {
     let cancelled = false
     ;(async () => {
       try {
-        await refresh()
+        const list = await refresh()
+        ping({ snapshots: list.length })
       } catch (err) {
         if (!cancelled) {
           setNotice({
@@ -331,7 +333,8 @@ export default function App() {
           ...(result.blockedByMe ? { blockedByMe: result.blockedByMe } : {}),
         }
         await putSnapshot(snapshot)
-        await refresh(snapshot.id)
+        const saved = await refresh(snapshot.id)
+        ping({ uploaded: true, snapshots: saved.length })
 
         // 양쪽 다 많은데 겹치는 사람이 하나도 없으면 파일을 잘못 읽었을 가능성이 큽니다.
         // 숫자는 그럴듯해 보여도 전부 틀리므로 조용히 넘어가면 안 됩니다.
@@ -1229,13 +1232,19 @@ function Empty({
   )
 }
 
+/** 집계 주소가 설정된 빌드에서만 방문 수를 셉니다. */
+const COUNTS_VISITS = Boolean(import.meta.env.VITE_API_URL)
+
 function Footer() {
   return (
     <footer className="gutter mx-auto w-full max-w-[680px] pb-12">
       <p className="ko text-[13px] leading-[1.7] text-faint">
         언팔로그는 인스타그램 공식 데이터 내보내기 파일만 사용해요. 계정 로그인 정보를 요구하지
-        않고, 분석 결과를 어디에도 전송하지 않아요. 저장된 스냅샷은 이 브라우저에만 있어서,
-        브라우저 데이터를 지우면 함께 사라져요.
+        않아요. 팔로워 목록과 분석 결과는 브라우저 밖으로 나가지 않고, 저장된 스냅샷도 이
+        브라우저에만 있어서 브라우저 데이터를 지우면 함께 사라져요.
+        {COUNTS_VISITS
+          ? ' 얼마나 쓰이는지 보려고 방문 횟수만 익명으로 세요. 누구인지 알 수 있는 정보는 보내지 않아요.'
+          : ''}
       </p>
       <p className="ko mt-2 text-[13px] text-faint">
         Instagram은 Meta Platforms, Inc.의 상표이며 이 프로젝트와 아무 관련이 없어요.

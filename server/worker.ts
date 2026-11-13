@@ -1,0 +1,166 @@
+/**
+ * 언팔로그 방문 집계 서버 (Cloudflare Workers + D1)
+ *
+ * 받는 것: 브라우저가 만든 난수 코드, 방문/업로드 여부, 스냅샷 개수.
+ * 받지 않는 것: 팔로워 목록, 아이디, 전화번호, IP 저장.
+ *
+ *   POST /v      방문·업로드 기록
+ *   GET  /admin  관리자 화면 (ADMIN_KEY 필요)
+ */
+
+export interface Env {
+  DB: D1Database
+  ADMIN_KEY: string
+  ALLOWED_ORIGIN: string
+}
+
+const CODE_RE = /^[0-9a-f]{16}$/
+
+function cors(origin: string) {
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Max-Age': '86400',
+  }
+}
+
+/** 서버 시각 기준 한국 날짜. 하루 한 번만 세기 위한 기준입니다. */
+function todayKST(now = Date.now()) {
+  return new Date(now + 9 * 3600_000).toISOString().slice(0, 10)
+}
+
+async function recordVisit(env: Env, body: unknown) {
+  const b = (body ?? {}) as Record<string, unknown>
+  const code = typeof b.code === 'string' ? b.code : ''
+  if (!CODE_RE.test(code)) return new Response('bad code', { status: 400 })
+
+  const uploaded = b.uploaded === true
+  const snapshots = Number.isInteger(b.snapshots) ? Math.min(Number(b.snapshots), 9999) : 0
+  const now = Date.now()
+  const day = todayKST(now)
+
+  // 방문은 하루에 한 번만 셉니다. 새로고침으로 숫자가 부풀지 않게.
+  await env.DB.prepare(
+    `INSERT INTO visitor (code, first_at, last_at, visits, uploads, snapshots, last_day)
+     VALUES (?1, ?2, ?2, 1, ?3, ?4, ?5)
+     ON CONFLICT(code) DO UPDATE SET
+       last_at   = ?2,
+       visits    = visits + (CASE WHEN last_day IS ?5 THEN 0 ELSE 1 END),
+       uploads   = uploads + ?3,
+       snapshots = MAX(snapshots, ?4),
+       last_day  = ?5`,
+  )
+    .bind(code, now, uploaded ? 1 : 0, snapshots, day)
+    .run()
+
+  return new Response(null, { status: 204 })
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+}
+
+async function adminPage(env: Env) {
+  const totals = await env.DB.prepare(
+    `SELECT
+       COUNT(*)                                   AS people,
+       SUM(CASE WHEN visits >= 2 THEN 1 ELSE 0 END) AS returned,
+       SUM(CASE WHEN uploads >= 1 THEN 1 ELSE 0 END) AS uploaded,
+       SUM(CASE WHEN snapshots >= 2 THEN 1 ELSE 0 END) AS compared,
+       SUM(uploads)                               AS upload_total
+     FROM visitor`,
+  ).first<Record<string, number>>()
+
+  const rows = await env.DB.prepare(
+    `SELECT code, first_at, last_at, visits, uploads, snapshots
+     FROM visitor ORDER BY last_at DESC LIMIT 200`,
+  ).all<Record<string, number | string>>()
+
+  const people = Number(totals?.people ?? 0)
+  const returned = Number(totals?.returned ?? 0)
+  const compared = Number(totals?.compared ?? 0)
+  const rate = people ? Math.round((returned / people) * 100) : 0
+  const compareRate = people ? Math.round((compared / people) * 100) : 0
+  const fmt = (ms: unknown) =>
+    new Date(Number(ms)).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+
+  const body = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>언팔로그 · 방문 현황</title>
+<style>
+ body{margin:0;padding:24px 16px;background:#f2f4f6;color:#191f28;
+      font-family:-apple-system,BlinkMacSystemFont,system-ui,'Malgun Gothic',sans-serif;
+      letter-spacing:-0.01em}
+ .wrap{max-width:900px;margin:0 auto}
+ h1{font-size:22px;margin:0 0 16px}
+ .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
+ .c{background:#fff;border-radius:16px;padding:16px}
+ .c .n{font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+ .c .l{font-size:13px;color:#6b7684}
+ .c .s{font-size:12px;color:#8b95a1;margin-top:2px}
+ table{width:100%;border-collapse:collapse;background:#fff;border-radius:16px;overflow:hidden;font-size:13px}
+ th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #f0f2f4;font-variant-numeric:tabular-nums}
+ th{background:#f9fafb;font-size:12px;color:#6b7684;font-weight:600}
+ tr:last-child td{border:0}
+ code{font-family:ui-monospace,monospace;color:#6b7684}
+ .hint{font-size:12px;color:#8b95a1;margin-top:14px;line-height:1.6}
+</style></head><body><div class="wrap">
+<h1>언팔로그 · 방문 현황</h1>
+<div class="cards">
+  <div class="c"><div class="l">전체 방문자</div><div class="n">${people}</div></div>
+  <div class="c"><div class="l">2번 이상 온 사람</div><div class="n">${returned}</div><div class="s">재방문율 ${rate}%</div></div>
+  <div class="c"><div class="l">파일을 올린 사람</div><div class="n">${Number(totals?.uploaded ?? 0)}</div></div>
+  <div class="c"><div class="l">두 번 이상 올린 사람</div><div class="n">${compared}</div><div class="s">${compareRate}% · 언팔을 실제로 본 사람</div></div>
+</div>
+<table>
+<tr><th>코드</th><th>방문</th><th>업로드</th><th>스냅샷</th><th>처음</th><th>마지막</th></tr>
+${rows.results
+  .map(
+    (r) =>
+      `<tr><td><code>${escapeHtml(String(r.code)).slice(0, 8)}…</code></td><td>${r.visits}</td><td>${r.uploads}</td><td>${r.snapshots}</td><td>${fmt(r.first_at)}</td><td>${fmt(r.last_at)}</td></tr>`,
+  )
+  .join('')}
+</table>
+<p class="hint">
+  코드는 브라우저가 만든 난수예요. 누구인지 알 수 있는 정보는 저장하지 않아요.<br>
+  방문은 하루에 한 번만 세요. <b>두 번 이상 올린 사람</b>이 구독이 성립하는지 보여주는 숫자예요.
+</p>
+</div></body></html>`
+  return new Response(body, { headers: { 'content-type': 'text/html;charset=utf-8' } })
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url)
+    const origin = env.ALLOWED_ORIGIN
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: cors(origin) })
+    }
+
+    if (url.pathname === '/v' && request.method === 'POST') {
+      // 우리 사이트에서 온 요청만 받습니다.
+      const from = request.headers.get('origin')
+      if (from && from !== origin) return new Response('forbidden', { status: 403 })
+      let body: unknown
+      try {
+        body = await request.json()
+      } catch {
+        return new Response('bad json', { status: 400 })
+      }
+      const res = await recordVisit(env, body)
+      return new Response(res.body, { status: res.status, headers: cors(origin) })
+    }
+
+    if (url.pathname === '/admin') {
+      // 열쇠는 Workers 비밀값에만 있습니다. 공개 저장소에 들어가지 않습니다.
+      if (url.searchParams.get('key') !== env.ADMIN_KEY) {
+        return new Response('열쇠가 필요해요: /admin?key=...', { status: 401 })
+      }
+      return adminPage(env)
+    }
+
+    return new Response('not found', { status: 404 })
+  },
+}
