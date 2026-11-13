@@ -34,11 +34,25 @@ jobs:
       # 검사가 하나라도 깨지면 배포하지 않습니다.
       - run: npm run typecheck
       - run: npm test
+      # 집계 주소가 들어왔는지 값은 감추고 확인합니다.
+      # Variables 와 Secrets 둘 중 어디에 넣어도 되게 해 둡니다.
+      - name: check VITE_API_URL
+        env:
+          FROM_VARS: ${{ vars.VITE_API_URL }}
+          FROM_SECRETS: ${{ secrets.VITE_API_URL }}
+        run: |
+          if [ -n "$FROM_VARS" ]; then
+            echo "VITE_API_URL: Variables 에서 찾음 (${#FROM_VARS}자)"
+          elif [ -n "$FROM_SECRETS" ]; then
+            echo "VITE_API_URL: Secrets 에서 찾음 (${#FROM_SECRETS}자)"
+          else
+            echo "VITE_API_URL 이 비어 있음 — 방문 집계 없이 빌드합니다."
+            echo "  Settings → Secrets and variables → Actions → Variables 에 추가하세요."
+          fi
+
       - run: npm run build
         env:
-          # 저장소 Settings → Secrets and variables → Actions → Variables 에
-          # VITE_API_URL 을 넣으면 방문 집계가 켜집니다. 없으면 아무것도 보내지 않습니다.
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || secrets.VITE_API_URL }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true
