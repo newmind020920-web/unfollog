@@ -17,16 +17,25 @@ Cloudflare 대시보드 → **Workers & Pages** → `Create` → **Pages** 탭
 | Build output directory | `dist` |
 | Root directory | (비움) |
 
-## 3. 환경변수
+## 3. 환경변수 — Build 쪽에 넣어야 합니다
 
-**Settings → Variables and Secrets** 에서 추가합니다.
+**Settings → Build → Variables and secrets** 에서 추가합니다.
+
+`Runtime variables and secrets` 는 다른 것입니다. 거기에 넣으면
+"Variables cannot be added to a Worker that only has static assets" 가
+뜹니다. VITE_API_URL 은 사이트를 **만들 때** 코드 안에 박히는 값이라,
+다 만들어진 뒤에 주는 런타임 변수로는 아무 소용이 없습니다.
 
 | 이름 | 값 |
 | --- | --- |
 | `VITE_API_URL` | `https://unfollog-api.newmind020920.workers.dev` |
 
-없으면 방문 집계가 꺼진 채로 빌드됩니다. 빌드 로그에 어디서 찾았는지
-찍히니 그걸로 확인할 수 있습니다.
+제대로 들어갔는지는 빌드 로그에서 바로 보입니다.
+
+    [unfollog] 방문 집계 켜짐 (주소 46자)
+    [unfollog] 방문 집계 꺼짐 — VITE_API_URL 이 비어 있습니다
+
+값 자체는 찍지 않습니다.
 
 ## 4. 집계 서버에 새 주소 알려주기 — 빠뜨리기 쉬움
 
