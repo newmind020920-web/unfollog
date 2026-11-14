@@ -35,3 +35,33 @@ ffmpeg -i raw/*.webm -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=4410
 
 빌드할 때 `VITE_API_URL` 을 **빼고** 하세요. 넣고 찍으면 촬영이 방문자로
 기록되고, 그러잖아도 미리보기 주소 때문에 숫자가 부풀어 있습니다.
+
+## 카드뉴스
+
+```bash
+cd promo/cards
+node build.mjs        # out/01.png … 08.png (1080x1350)
+```
+
+`cards.mjs` 의 글만 고치면 다시 그려집니다. 디자인은 `style.css` 에 있습니다.
+
+### 서체
+
+제목은 나눔명조, 본문은 Pretendard 입니다. 제목까지 고딕으로 가면 매거진
+느낌이 안 나고, 본문까지 명조면 읽기 어려워집니다.
+
+`fonts/` 에 든 명조는 **카드에 실제로 쓰인 글자만** 담긴 조각입니다. 전체를
+받으면 몇 MB 인데 76KB 로 끝납니다. 글을 고쳐서 없던 글자가 생기면 네모로
+나오니, 그때는 다시 받으세요.
+
+```bash
+# cards.mjs 에 쓰인 글자를 뽑아 그 글자만 담긴 서체를 받습니다
+node -e "import('./cards.mjs').then(({CARDS})=>{
+  const t=JSON.stringify(CARDS);
+  require('fs').writeFileSync('chars.txt',
+    [...new Set(t.replace(/[\\\\\"\[\]{}:,]/g,''))].sort().join(''))})"
+TXT=$(python3 -c "import urllib.parse;print(urllib.parse.quote(open('chars.txt').read().strip()))")
+curl -sS -A Mozilla/5.0 \
+  "https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&text=$TXT" -o sub.css
+# sub.css 안의 주소를 받아 fonts/ 에 넣고, myeongjo.css 의 경로를 로컬로 바꾸세요
+```

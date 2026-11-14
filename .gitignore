@@ -14,3 +14,5 @@ promo/today*
 promo/*.mp4
 promo/*.png
 promo/shots
+promo/cards/out
+promo/cards/index.html
