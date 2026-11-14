@@ -153,6 +153,10 @@ function newSnapshotLabel(createdAt: number, existing: SnapshotMeta[]) {
 
 const num = (n: number) => n.toLocaleString('ko-KR')
 
+/** 초 단위 시각을 "2025년 5월" 로. 파일이 담고 있는 기간을 말할 때 씁니다. */
+const monthLabel = (sec: number) =>
+  new Date(sec * 1000).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
+
 /**
  * 분석은 보통 눈 깜짝할 사이에 끝납니다. 그대로 두면 무엇을 읽었는지
  * 보이지 않고 결과만 튀어나와서, 제대로 처리됐는지 믿기 어렵습니다.
@@ -336,6 +340,8 @@ export default function App() {
           // 누가 끊었는지 가리는 근거 — 파일이 없었으면 undefined 로 둡니다.
           ...(result.unfollowedByMe ? { unfollowedByMe: result.unfollowedByMe } : {}),
           ...(result.blockedByMe ? { blockedByMe: result.blockedByMe } : {}),
+          sources: result.sources,
+          coverage: result.coverage,
         }
         await putSnapshot(snapshot)
         const saved = await refresh(snapshot.id)
@@ -351,8 +357,17 @@ export default function App() {
           !result.following.some((u) => followerKeys.has(u.username))
 
         const prevNewest = existing[0]
+        const narrowed = result.coverage?.likelyNarrowed
         setNotice(
-          noOverlap
+          narrowed
+            ? {
+                tone: 'red',
+                text:
+                  `이 파일에는 ${monthLabel(result.coverage!.first)}부터의 기록만 담겨 있어요. ` +
+                  '그 전부터 인스타를 쓰셨다면 내보낼 때 기간이 ‘전체’가 아니어서 숫자가 적게 ' +
+                  '나온 거예요. 기간을 ‘전체’로 다시 내보내 주세요.',
+              }
+            : noOverlap
             ? {
                 tone: 'red',
                 text:
@@ -1032,6 +1047,12 @@ function WhyDifferent() {
             파일에는 계정이 살아 있는지가 적혀 있지 않아서, 저희도 어느 계정인지 가려낼 수 없어요.
             그래서 <b className="font-semibold text-fg-2">언팔 목록에도 사라진 계정이 섞일 수
             있어요.</b>
+          </p>
+          <p className="mt-3.5 border-t border-line pt-3.5">
+            <b className="font-semibold text-fg-2">반대로 훨씬 적게 나온다면</b> 내보낼 때
+            기간이 ‘전체’가 아니었을 가능성이 커요. 기간을 좁히면 그 기간에 팔로우한 사람만
+            파일에 담겨서, 800명이 500명처럼 나와요. 내보내기 화면에서{' '}
+            <b className="font-semibold text-fg-2">기간 → 전체</b>를 고르고 다시 받아주세요.
           </p>
         </div>
       )}

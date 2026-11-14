@@ -113,6 +113,16 @@ export function SnapshotPanel({
                 팔로잉 {meta.followingCount.toLocaleString('ko-KR')}명
               </p>
 
+              {meta.sources?.length ? (
+                <p className="tnum mt-1 text-[12px] leading-[1.6] text-faint">
+                  읽은 파일:{' '}
+                  {[...meta.sources]
+                    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'followers' ? -1 : 1))
+                    .map((src) => `${src.file} ${src.count.toLocaleString('ko-KR')}명`)
+                    .join(' · ')}
+                </p>
+              ) : null}
+
               {isDeleting ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="ko mr-1 text-[14px] font-medium text-fg-2">

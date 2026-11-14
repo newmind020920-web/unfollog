@@ -95,6 +95,8 @@ export function toMeta(s: Snapshot): SnapshotMeta {
     label: s.label,
     followerCount: s.followers.length,
     followingCount: s.following.length,
+    ...(s.sources ? { sources: s.sources } : {}),
+    ...(s.coverage ? { coverage: s.coverage } : {}),
     ...(s.sample ? { sample: true } : {}),
   }
 }

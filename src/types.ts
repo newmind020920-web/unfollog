@@ -22,6 +22,10 @@ export type Snapshot = {
   unfollowedByMe?: IgUser[]
   /** 내가 차단한 계정. 내보내기에 그 파일이 없었으면 undefined */
   blockedByMe?: IgUser[]
+  /** 어느 파일에서 몇 명을 읽었는지. 숫자가 이상할 때 확인용 */
+  sources?: { file: string; kind: 'followers' | 'following'; count: number }[]
+  /** 파일이 담고 있는 기간. 기간을 좁혀 내보냈는지 판단합니다 */
+  coverage?: { first: number; last: number; likelyNarrowed: boolean }
   /** 체험용 샘플 데이터인가 — 실제 업로드와 섞이지 않게 구분합니다 */
   sample?: boolean
 }
@@ -33,6 +37,8 @@ export type SnapshotMeta = {
   label: string
   followerCount: number
   followingCount: number
+  sources?: { file: string; kind: 'followers' | 'following'; count: number }[]
+  coverage?: { first: number; last: number; likelyNarrowed: boolean }
   sample?: boolean
 }
 
@@ -43,6 +49,8 @@ export type ParseResult = {
   blockedByMe?: IgUser[]
   /** 어떤 파일에서 무엇을 읽었는지 — UI에서 사용자에게 보여줄 근거 */
   sources: { file: string; kind: 'followers' | 'following'; count: number }[]
+  /** 파일에 담긴 기간. 내보낼 때 기간을 좁혔는지 판단하는 근거 */
+  coverage?: { first: number; last: number; likelyNarrowed: boolean }
   /** 치명적이지 않은 문제 (예: 파일 하나를 못 읽음) */
   warnings: string[]
 }

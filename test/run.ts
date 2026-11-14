@@ -1,4 +1,4 @@
-import { parseFiles, parseExportDate } from '../src/lib/parse'
+import { chooseFiles, parseFiles, parseExportDate } from '../src/lib/parse'
 import { analyze, compare, departureTracker } from '../src/lib/analyze'
 import type { Snapshot } from '../src/types'
 import { buildZip, followersJson, followingJson, pendingJson } from './fixture'
@@ -371,6 +371,51 @@ async function main() {
       new File([JSON.stringify({ relationships_following: JSON.parse(followingJson([['zoe', 1]])).relationships_following })], 'renamed.json'),
     ])
     eq('파일명이 바뀌어도 내용으로 following 판별', r5.following.map((u) => u.username), ['zoe'])
+  }
+
+  console.log('\n내보내기 기간 감지')
+  {
+    const DAY = 86_400
+    const now = Math.floor(Date.UTC(2026, 10, 14) / 1000)
+    const span = (count: number, oldestDaysAgo: number) =>
+      Array.from({ length: count }, (_, i): [string, number] => [
+        `u${i}`,
+        now - Math.round((oldestDaysAgo * i) / Math.max(count - 1, 1)) * DAY,
+      ])
+
+    // 기간을 "전체" 로 내보낸 경우: 몇 년 치가 담깁니다.
+    const wide = await parseFiles([new File([followersJson(span(60, 1500))], 'followers_1.json')])
+    check('기간이 넓으면 경고 없음', wide.coverage?.likelyNarrowed === false, wide.coverage)
+
+    // 기간을 좁혀 내보낸 경우: 최근 90일만 담겨 숫자가 적게 나옵니다.
+    const narrow = await parseFiles([new File([followersJson(span(60, 90))], 'followers_1.json')])
+    check('기간이 좁으면 경고', narrow.coverage?.likelyNarrowed === true, narrow.coverage)
+
+    // 사람이 몇 명 없으면 기간이 짧은 게 당연하므로 경고하지 않습니다.
+    const few = await parseFiles([new File([followersJson(span(5, 10))], 'followers_1.json')])
+    check('사람이 적으면 경고 안 함', few.coverage?.likelyNarrowed === false, few.coverage)
+  }
+
+  console.log('\nJSON 과 HTML 이 섞인 ZIP')
+  {
+    // blocked_profiles.json 하나 때문에 followers HTML 이 통째로 버려지면 안 됩니다.
+    eq(
+      'JSON 이 섞여도 HTML 팔로워를 읽음',
+      chooseFiles(['followers_1.html', 'following.html', 'blocked_profiles.json']),
+      ['followers_1.html', 'following.html', 'blocked_profiles.json'],
+    )
+    // 같은 종류가 둘 다 있으면 JSON 만 씁니다.
+    eq(
+      '같은 종류는 JSON 우선',
+      chooseFiles(['followers_1.html', 'followers_1.json', 'following.html']),
+      ['followers_1.json', 'following.html'],
+    )
+    // 쪼개진 HTML 은 전부 읽습니다.
+    eq(
+      '쪼개진 HTML 은 전부 읽음',
+      chooseFiles(['followers_1.html', 'followers_2.html']),
+      ['followers_1.html', 'followers_2.html'],
+    )
   }
 
   console.log(`\n${checks - failures}/${checks} 통과`)

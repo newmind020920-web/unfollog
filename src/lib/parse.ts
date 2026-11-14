@@ -233,6 +233,8 @@ type Collected = {
   unfollowedByMe?: Map<string, IgUser>
   blockedByMe?: Map<string, IgUser>
   sources: ParseResult['sources']
+  /** 파일에 적힌 팔로우 시각의 처음과 끝 — 기간을 좁혀 내보냈는지 알아내는 단서 */
+  span: { first?: number; last?: number }
   warnings: string[]
   report?: (step: ParseStep) => Promise<void> | void
 }
@@ -274,6 +276,23 @@ async function absorb(c: Collected, path: string, text: string) {
     return
   }
   c.sources.push({ file: basename(path), kind, count: users.length })
+  for (const u of users) {
+    if (!u.followedAt) continue
+    if (!c.span.first || u.followedAt < c.span.first) c.span.first = u.followedAt
+    if (!c.span.last || u.followedAt > c.span.last) c.span.last = u.followedAt
+  }
+}
+
+/**
+ * 읽을 파일을 고릅니다. 같은 종류가 JSON 과 HTML 로 둘 다 있으면 JSON 만 씁니다.
+ *
+ * 종류별로 따로 봅니다. 예전에는 전체를 한 번에 봐서, blocked_profiles.json 하나만
+ * 섞여 있어도 followers_1.html 까지 통째로 버려지고 팔로워가 0 이 되었습니다.
+ */
+export function chooseFiles(names: string[]): string[] {
+  const isJson = (name: string) => /\.json$/i.test(name)
+  const jsonKinds = new Set(names.filter(isJson).map(classifyFileName))
+  return names.filter((name) => isJson(name) || !jsonKinds.has(classifyFileName(name)))
 }
 
 async function absorbZip(c: Collected, file: File) {
@@ -299,9 +318,8 @@ async function absorbZip(c: Collected, file: File) {
     )
   }
 
-  // JSON 과 HTML 이 모두 있으면 JSON 만 씁니다.
-  const hasJson = wanted.some((e) => /\.json$/i.test(e.name))
-  const chosen = hasJson ? wanted.filter((e) => /\.json$/i.test(e.name)) : wanted
+  const keep = new Set(chooseFiles(wanted.map((e) => e.name)))
+  const chosen = wanted.filter((e) => keep.has(e.name))
 
   for (const entry of chosen) {
     try {
@@ -333,6 +351,7 @@ export async function parseFiles(
     followers: new Map(),
     following: new Map(),
     sources: [],
+    span: {},
     warnings: [],
     report,
   }
@@ -358,6 +377,24 @@ export async function parseFiles(
     unfollowedByMe: c.unfollowedByMe ? Array.from(c.unfollowedByMe.values()) : undefined,
     blockedByMe: c.blockedByMe ? Array.from(c.blockedByMe.values()) : undefined,
     sources: c.sources,
+    coverage: coverageOf(c),
     warnings: c.warnings,
   }
+}
+
+/** 기간 옵션 중 가장 긴 것이 "지난 1년" 이므로, 그보다 짧으면 좁혀 내보낸 것으로 봅니다. */
+const NARROW_DAYS = 400
+
+/**
+ * 파일이 담고 있는 기간을 돌려줍니다.
+ *
+ * 내보내기에서 기간을 "전체" 로 고르지 않으면 그 기간에 팔로우한 사람만 파일에
+ * 들어옵니다. 파일 자체가 짧은 것이라 파서는 아무 잘못이 없고, 그래서 숫자가
+ * 조용히 적게 나옵니다. 담긴 기간이 1년 남짓이면 그 가능성을 알려 줍니다.
+ */
+function coverageOf(c: Collected): ParseResult['coverage'] {
+  const { first, last } = c.span
+  if (!first || !last) return undefined
+  const days = (last - first) / 86_400
+  return { first, last, likelyNarrowed: days < NARROW_DAYS && c.followers.size + c.following.size >= 30 }
 }
