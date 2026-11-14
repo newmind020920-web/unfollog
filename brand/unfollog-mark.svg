@@ -1,0 +1,16 @@
+<!-- 언팔로그 마크 — 끊긴 고리. 이어져 있던 팔로우가 한 곳 끊어진 모양입니다.
+     프로필 사진용. 인스타·스레드는 동그랗게 자르므로 배경이 원입니다. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <linearGradient id="unfollog" x1="0" y1="1080" x2="1080" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f7963c"/>
+      <stop offset=".52" stop-color="#d42e86"/>
+      <stop offset="1" stop-color="#7b3fe4"/>
+    </linearGradient>
+  </defs>
+  <circle cx="540" cy="540" r="540" fill="url(#unfollog)"/>
+  <g transform="translate(200 200) scale(28.333)">
+    <path d="M16.8 6.25A7.5 7.5 0 1 1 7.2 6.25" fill="none" stroke="#fff"
+          stroke-width="3.3" stroke-linecap="round"/>
+  </g>
+</svg>
