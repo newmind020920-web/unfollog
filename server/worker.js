@@ -69,8 +69,9 @@ async function adminPage(env) {
      FROM visitor`,
   ).first()
 
+  // rowid 는 들어온 순서대로 붙는 번호입니다. 긴 난수 코드 대신 이걸 보여줍니다.
   const rows = await env.DB.prepare(
-    `SELECT code, first_at, last_at, visits, uploads, snapshots
+    `SELECT rowid AS seq, code, first_at, last_at, visits, uploads, snapshots
      FROM visitor ORDER BY last_at DESC LIMIT 200`,
   ).all()
 
@@ -78,9 +79,9 @@ async function adminPage(env) {
   const returned = Number((totals && totals.returned) || 0)
   const compared = Number((totals && totals.compared) || 0)
   const uploadedPeople = Number((totals && totals.uploaded) || 0)
-  const rate = people ? Math.round((returned / people) * 100) : 0
-  const compareRate = people ? Math.round((compared / people) * 100) : 0
+  const pct = (n) => (people ? `${Math.round((n / people) * 100)}%` : '—')
   const fmt = (ms) => new Date(Number(ms)).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+  const no = (n) => String(n).padStart(5, '0')
 
   const body = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -102,25 +103,37 @@ async function adminPage(env) {
  tr:last-child td{border:0}
  code{font-family:ui-monospace,monospace;color:#6b7684}
  .hint{font-size:12px;color:#8b95a1;margin-top:14px;line-height:1.6}
+ .funnel{background:#fff;border-radius:16px;padding:16px;margin-bottom:22px;font-size:15px;
+         font-variant-numeric:tabular-nums}
+ .funnel b{font-size:19px;margin:0 2px}
+ .funnel i{color:#6b7684;font-style:normal;font-size:13px}
+ .funnel .ar{color:#b0b8c1;margin:0 8px}
 </style></head><body><div class="wrap">
 <h1>언팔로그 · 방문 현황</h1>
 <div class="cards">
   <div class="c"><div class="l">전체 방문자</div><div class="n">${people}</div></div>
-  <div class="c"><div class="l">2번 이상 온 사람</div><div class="n">${returned}</div><div class="s">재방문율 ${rate}%</div></div>
-  <div class="c"><div class="l">파일을 올린 사람</div><div class="n">${uploadedPeople}</div></div>
-  <div class="c"><div class="l">두 번 이상 올린 사람</div><div class="n">${compared}</div><div class="s">${compareRate}% · 언팔을 실제로 본 사람</div></div>
+  <div class="c"><div class="l">파일을 올린 사람</div><div class="n">${uploadedPeople}</div><div class="s">방문자의 ${pct(uploadedPeople)}</div></div>
+  <div class="c"><div class="l">두 번 이상 올린 사람</div><div class="n">${compared}</div><div class="s">방문자의 ${pct(compared)} · 언팔을 본 사람</div></div>
+  <div class="c"><div class="l">2번 이상 온 사람</div><div class="n">${returned}</div><div class="s">재방문율 ${pct(returned)}</div></div>
+</div>
+
+<div class="funnel">
+  방문 <b>${people}</b>
+  <span class="ar">→</span> 업로드 <b>${uploadedPeople}</b> <i>${pct(uploadedPeople)}</i>
+  <span class="ar">→</span> 두 번 업로드 <b>${compared}</b> <i>${pct(compared)}</i>
 </div>
 <table>
-<tr><th>코드</th><th>방문</th><th>업로드</th><th>스냅샷</th><th>처음</th><th>마지막</th></tr>
+<tr><th>번호</th><th>방문</th><th>업로드</th><th>스냅샷</th><th>처음</th><th>마지막</th></tr>
 ${rows.results
   .map(
     (r) =>
-      `<tr><td><code>${escapeHtml(String(r.code)).slice(0, 8)}…</code></td><td>${r.visits}</td><td>${r.uploads}</td><td>${r.snapshots}</td><td>${fmt(r.first_at)}</td><td>${fmt(r.last_at)}</td></tr>`,
+      `<tr><td><code title="${escapeHtml(String(r.code))}">${no(r.seq)}</code></td><td>${r.visits}</td><td>${r.uploads}</td><td>${r.snapshots}</td><td>${fmt(r.first_at)}</td><td>${fmt(r.last_at)}</td></tr>`,
   )
   .join('')}
 </table>
 <p class="hint">
-  코드는 브라우저가 만든 난수예요. 누구인지 알 수 있는 정보는 저장하지 않아요.<br>
+  번호는 들어온 순서예요. 누구인지 알 수 있는 정보는 저장하지 않아요.
+  (번호에 마우스를 올리면 실제 코드가 보여요.)<br>
   방문은 하루에 한 번만 세요. <b>두 번 이상 올린 사람</b>이 구독이 성립하는지 보여주는 숫자예요.
 </p>
 </div></body></html>`

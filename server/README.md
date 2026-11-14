@@ -31,6 +31,9 @@ Cloudflare Workers + D1. 무료 한도(하루 10만 요청) 안에서 충분히 
 
 ## 배포 — 명령줄로
 
+저장소 루트에도 `wrangler.jsonc` (사이트용) 가 있어서, 명령에
+`--config wrangler.toml` 을 붙이지 않으면 그쪽을 집어갑니다.
+
 ```bash
 cd server
 npm i -D wrangler
@@ -40,13 +43,13 @@ npx wrangler login
 npx wrangler d1 create unfollog
 
 # 2) 표 만들기
-npx wrangler d1 execute unfollog --remote --file=schema.sql
+npx wrangler d1 execute unfollog --config wrangler.toml --remote --file=schema.sql
 
 # 3) 관리자 열쇠 정하기 (길고 추측하기 어려운 값으로)
-npx wrangler secret put ADMIN_KEY
+npx wrangler secret put ADMIN_KEY --config wrangler.toml
 
 # 4) 올리기
-npx wrangler deploy
+npx wrangler deploy --config wrangler.toml
 ```
 
 올리고 나면 `https://unfollog-api.<계정>.workers.dev` 주소가 나옵니다.
@@ -66,6 +69,9 @@ https://unfollog-api.<계정>.workers.dev/admin?key=<ADMIN_KEY>
 ```
 
 보이는 숫자:
+
+표에는 들어온 순서대로 번호(00001…)가 붙습니다. 번호에 마우스를
+올리면 실제 코드가 보입니다.
 
 - **전체 방문자** — 코드를 받은 브라우저 수
 - **2번 이상 온 사람 / 재방문율** — 다시 찾아오는지
