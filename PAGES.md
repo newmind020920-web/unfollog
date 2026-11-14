@@ -1,7 +1,7 @@
 # Cloudflare 에 사이트 올리기
 
 집계 서버(`unfollog-api`)와 같은 계정에, 사이트를 `unfollog` 라는
-이름으로 올립니다. 주소는 `https://unfollog.<계정>.workers.dev` 입니다.
+이름으로 올립니다. 주소는 `https://unfollog.pages.dev` 입니다.
 
 사이트는 코드가 도는 서버가 아니라 빌드 결과(`dist`)를 그대로
 내보내기만 합니다. 설정은 저장소 루트의 `wrangler.jsonc` 에 있습니다.
@@ -44,7 +44,7 @@
 
 | 이름 | 바꿀 값 |
 | --- | --- |
-| `ALLOWED_ORIGIN` | `https://unfollog.<계정>.workers.dev` |
+| `ALLOWED_ORIGIN` | `https://unfollog.pages.dev` |
 
 끝에 `/` 를 붙이면 안 됩니다. 브라우저는 경로 없이 출처만 보냅니다.
 사이트 주소와 한 글자라도 다르면 서버가 403 으로 거절하고 집계가

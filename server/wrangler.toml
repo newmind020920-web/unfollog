@@ -7,7 +7,7 @@ compatibility_date = "2026-01-01"
 #
 # 사이트 주소. 다른 곳에서 함부로 기록을 쌓지 못하게 막습니다.
 [vars]
-ALLOWED_ORIGIN = "https://newmind020920-web.github.io"
+ALLOWED_ORIGIN = "https://unfollog.pages.dev"
 
 [[d1_databases]]
 binding = "DB"
