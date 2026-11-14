@@ -40,8 +40,22 @@ ffmpeg -i raw/*.webm -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=4410
 
 ```bash
 cd promo/cards
-node build.mjs        # out/01.png … 08.png (1080x1350)
+node darkshots.mjs    # 카드 윗단에 넣을 앱 다크 모드 화면 (사이트가 떠 있어야 함)
+node build.mjs        # out/01.png … 09.png (1440x1800)
 ```
+
+### 해상도
+
+2배(2160x2700)로 그린 뒤 **1440x1800** 으로 줄여 내보냅니다. `out/2x/` 에
+줄이기 전 원본이 남습니다.
+
+1080 으로 그대로 내보내면 요즘 폰에서 확대돼 보여서 뿌옇습니다. 인스타는
+가로 1440 까지만 받고 그보다 크면 자기 방식으로 줄이는데, 2배로 그려 직접
+줄이는 쪽이 훨씬 또렷합니다.
+
+같은 이유로 `darkshots.mjs` 도 배율 2 로 찍습니다. 여기만 1배로 두면 카드
+안에서 두 배로 늘어나 **그 부분만** 뿌옇게 보입니다. 실제로 그렇게 나왔었고,
+아래 제목은 선명한데 위쪽 화면만 흐린 것으로 알아챘습니다.
 
 `cards.mjs` 의 글만 고치면 다시 그려집니다. 디자인은 `style.css` 에 있습니다.
 

@@ -8,9 +8,11 @@ const OUT = 'darkshots'
 rmSync(OUT, { recursive: true, force: true }); mkdirSync(OUT)
 
 const b = await pw.chromium.launch({ args: ['--no-proxy-server', '--no-sandbox'] })
+// 화면 배율 2 로 찍습니다. 카드도 2배로 그리기 때문에, 1배로 찍어 두면
+// 카드 안에서 두 배로 늘어나 그 부분만 뿌옇게 보입니다.
 const ctx = await b.newContext({
   viewport: { width: 1080, height: 1920 },
-  deviceScaleFactor: 1,
+  deviceScaleFactor: 2,
   colorScheme: 'dark',
 })
 const p = await ctx.newPage()

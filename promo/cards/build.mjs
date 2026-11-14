@@ -1,6 +1,7 @@
 // 카드뉴스를 그려서 1080x1350 PNG 로 뽑습니다.
 import pw from '/opt/node-tools/node_modules/playwright/index.js'
 import { rmSync, mkdirSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { CARDS } from './cards.mjs'
 
 const OUT = 'out'
@@ -66,14 +67,27 @@ const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 </head><body>${CARDS.map(card).join('')}</body></html>`
 writeFileSync('index.html', html)
 
+// 2배로 그린 뒤 1440 으로 줄입니다. 인스타는 가로 1440 까지만 받고, 그 위는
+// 자기 방식으로 줄여서 뭉갭니다. 2배로 그려 직접 줄이는 쪽이 훨씬 또렷합니다.
 const b = await pw.chromium.launch({ args: ['--no-sandbox'] })
-const p = await b.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 1 })
+const p = await b.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 2 })
 await p.goto('file://' + process.cwd() + '/index.html', { waitUntil: 'networkidle' })
 await p.evaluate(() => document.fonts.ready)
 await p.waitForTimeout(600)
 const cards = await p.locator('.card').all()
+mkdirSync(`${OUT}/2x`, { recursive: true })
 for (let i = 0; i < cards.length; i++) {
-  await cards[i].screenshot({ path: `${OUT}/${String(i + 1).padStart(2, '0')}.png` })
+  await cards[i].screenshot({ path: `${OUT}/2x/${String(i + 1).padStart(2, '0')}.png` })
 }
 await b.close()
+
+// 2160 → 1440 으로 줄입니다 (lanczos).
+execFileSync('python3', ['-c', `
+from PIL import Image
+import glob, os
+for f in sorted(glob.glob('${OUT}/2x/*.png')):
+    im = Image.open(f).convert('RGB')
+    im = im.resize((1440, 1800), Image.LANCZOS)
+    im.save(os.path.join('${OUT}', os.path.basename(f)), optimize=True)
+`])
 console.log(`카드 ${cards.length}장 / ${total}`)
