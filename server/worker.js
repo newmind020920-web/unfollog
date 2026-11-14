@@ -5,6 +5,7 @@
  * 받지 않는 것: 팔로워 목록, 아이디, 전화번호, IP 저장.
  *
  *   POST /v      방문·업로드 기록
+ *   POST /q      문의 접수
  *   GET  /admin  관리자 화면 (ADMIN_KEY 필요)
  *
  * Cloudflare 편집기에 그대로 붙여넣을 수 있도록 순수 자바스크립트로 씁니다.
@@ -55,6 +56,45 @@ async function recordVisit(env, body) {
   return new Response(null, { status: 204 })
 }
 
+/** 글자 수를 자릅니다. 길이를 서버에서 막지 않으면 데이터베이스가 쓰레기로 찹니다. */
+function clip(v, max) {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  if (!t) return null
+  return t.length > max ? t.slice(0, max) : t
+}
+
+async function recordInquiry(env, body) {
+  const b = body || {}
+  const message = clip(b.message, 2000)
+  if (!message) return new Response('empty', { status: 400 })
+
+  const code = typeof b.code === 'string' && CODE_RE.test(b.code) ? b.code : null
+  const contact = clip(b.contact, 200)
+  const meta = clip(b.meta, 500)
+  const now = Date.now()
+
+  // 같은 브라우저가 1분 안에 또 보내면 받지 않습니다. 눌림 방지 겸 도배 방지.
+  if (code) {
+    const recent = await env.DB.prepare(
+      `SELECT at FROM inquiry WHERE code = ?1 ORDER BY at DESC LIMIT 1`,
+    )
+      .bind(code)
+      .first()
+    if (recent && now - Number(recent.at) < 60_000) {
+      return new Response('too soon', { status: 429 })
+    }
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO inquiry (code, at, message, contact, meta) VALUES (?1, ?2, ?3, ?4, ?5)`,
+  )
+    .bind(code, now, message, contact, meta)
+    .run()
+
+  return new Response(null, { status: 204 })
+}
+
 function escapeHtml(s) {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 }
@@ -74,6 +114,12 @@ async function adminPage(env) {
     `SELECT rowid AS seq, code, first_at, last_at, visits, uploads, snapshots
      FROM visitor ORDER BY last_at DESC LIMIT 200`,
   ).all()
+
+  const inquiries = await env.DB.prepare(
+    `SELECT id, code, at, message, contact, meta, done
+     FROM inquiry ORDER BY at DESC LIMIT 100`,
+  ).all()
+  const openCount = inquiries.results.filter((q) => !q.done).length
 
   const people = Number((totals && totals.people) || 0)
   const returned = Number((totals && totals.returned) || 0)
@@ -108,6 +154,18 @@ async function adminPage(env) {
  .funnel b{font-size:19px;margin:0 2px}
  .funnel i{color:#6b7684;font-style:normal;font-size:13px}
  .funnel .ar{color:#b0b8c1;margin:0 8px}
+ h2{font-size:17px;margin:28px 0 12px}
+ .q{background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:8px}
+ .q.open{border-left:4px solid #f04452}
+ .q .top{display:flex;gap:8px;align-items:baseline;font-size:12px;color:#8b95a1;margin-bottom:6px;flex-wrap:wrap}
+ .q .msg{font-size:15px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+ .q .re{font-size:13px;color:#191f28;margin-top:8px;background:#f2f4f6;border-radius:10px;padding:8px 10px;
+        word-break:break-all}
+ .q .meta{font-size:12px;color:#8b95a1;margin-top:6px}
+ .q form{margin-top:10px}
+ .q button{font:inherit;font-size:12px;border:0;border-radius:8px;padding:6px 10px;cursor:pointer;
+           background:#f2f4f6;color:#6b7684}
+ .none{background:#fff;border-radius:16px;padding:18px;color:#8b95a1;font-size:14px}
 </style></head><body><div class="wrap">
 <h1>언팔로그 · 방문 현황</h1>
 <div class="cards">
@@ -115,6 +173,7 @@ async function adminPage(env) {
   <div class="c"><div class="l">파일을 올린 사람</div><div class="n">${uploadedPeople}</div><div class="s">방문자의 ${pct(uploadedPeople)}</div></div>
   <div class="c"><div class="l">두 번 이상 올린 사람</div><div class="n">${compared}</div><div class="s">방문자의 ${pct(compared)} · 언팔을 본 사람</div></div>
   <div class="c"><div class="l">2번 이상 온 사람</div><div class="n">${returned}</div><div class="s">재방문율 ${pct(returned)}</div></div>
+  <div class="c"><div class="l">안 읽은 문의</div><div class="n">${openCount}</div><div class="s">전체 ${inquiries.results.length}건</div></div>
 </div>
 
 <div class="funnel">
@@ -122,6 +181,28 @@ async function adminPage(env) {
   <span class="ar">→</span> 업로드 <b>${uploadedPeople}</b> <i>${pct(uploadedPeople)}</i>
   <span class="ar">→</span> 두 번 업로드 <b>${compared}</b> <i>${pct(compared)}</i>
 </div>
+<h2>문의 ${openCount ? `· 안 읽음 ${openCount}건` : ''}</h2>
+${
+  inquiries.results.length
+    ? inquiries.results
+        .map(
+          (q) => `<div class="q${q.done ? '' : ' open'}">
+  <div class="top"><b>#${q.id}</b><span>${fmt(q.at)}</span>${q.code ? `<span>방문자 ${escapeHtml(String(q.code)).slice(0, 8)}…</span>` : ''}${q.done ? '<span>처리함</span>' : ''}</div>
+  <div class="msg">${escapeHtml(String(q.message))}</div>
+  ${q.contact ? `<div class="re">답장받을 곳: ${escapeHtml(String(q.contact))}</div>` : ''}
+  ${q.meta ? `<div class="meta">${escapeHtml(String(q.meta))}</div>` : ''}
+  <form method="POST" action="/admin/done?key=${encodeURIComponent(env.ADMIN_KEY)}">
+    <input type="hidden" name="id" value="${q.id}">
+    <input type="hidden" name="to" value="${q.done ? 0 : 1}">
+    <button type="submit">${q.done ? '안 읽음으로' : '처리함으로'}</button>
+  </form>
+</div>`,
+        )
+        .join('')
+    : '<div class="none">아직 들어온 문의가 없어요.</div>'
+}
+
+<h2>방문자</h2>
 <table>
 <tr><th>번호</th><th>방문</th><th>업로드</th><th>스냅샷</th><th>처음</th><th>마지막</th></tr>
 ${rows.results
@@ -162,6 +243,36 @@ export default {
       }
       const res = await recordVisit(env, body)
       return new Response(res.body, { status: res.status, headers: cors(origin) })
+    }
+
+    if (url.pathname === '/q' && request.method === 'POST') {
+      const from = request.headers.get('origin')
+      if (from && from !== origin) return new Response('forbidden', { status: 403 })
+      let body
+      try {
+        body = await request.json()
+      } catch {
+        return new Response('bad json', { status: 400 })
+      }
+      const res = await recordInquiry(env, body)
+      return new Response(res.body, { status: res.status, headers: cors(origin) })
+    }
+
+    // 문의를 처리함/안 읽음으로 바꿉니다. 관리자 화면에서만 부릅니다.
+    if (url.pathname === '/admin/done' && request.method === 'POST') {
+      if (url.searchParams.get('key') !== env.ADMIN_KEY) {
+        return new Response('열쇠가 필요해요', { status: 401 })
+      }
+      const form = await request.formData()
+      const id = Number(form.get('id'))
+      const to = form.get('to') === '1' ? 1 : 0
+      if (Number.isInteger(id)) {
+        await env.DB.prepare(`UPDATE inquiry SET done = ?2 WHERE id = ?1`).bind(id, to).run()
+      }
+      return new Response(null, {
+        status: 303,
+        headers: { location: `/admin?key=${encodeURIComponent(env.ADMIN_KEY)}` },
+      })
     }
 
     if (url.pathname === '/admin') {

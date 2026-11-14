@@ -12,3 +12,17 @@ CREATE TABLE IF NOT EXISTS visitor (
 
 CREATE INDEX IF NOT EXISTS visitor_last_at ON visitor (last_at);
 CREATE INDEX IF NOT EXISTS visitor_visits ON visitor (visits);
+
+-- 문의 한 건당 한 줄. 사람을 특정할 수 있는 것은 본인이 적어 준
+-- 답장받을 곳(contact)뿐이고, 그것도 비워 둘 수 있습니다.
+CREATE TABLE IF NOT EXISTS inquiry (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  code      TEXT,                -- 보낸 브라우저의 난수 코드 (방문 기록과 잇기 위함)
+  at        INTEGER NOT NULL,    -- 보낸 시각 (ms)
+  message   TEXT NOT NULL,       -- 문의 내용
+  contact   TEXT,                -- 답장받을 곳. 적지 않으면 NULL
+  meta      TEXT,                -- 본인이 동의했을 때만 담기는 분석 정보 (숫자와 파일 이름)
+  done      INTEGER NOT NULL DEFAULT 0  -- 처리 완료 표시
+);
+
+CREATE INDEX IF NOT EXISTS inquiry_at ON inquiry (at);

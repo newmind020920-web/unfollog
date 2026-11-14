@@ -26,6 +26,8 @@ import { download } from './lib/export'
 import { ping } from './lib/visit'
 import { loadGone, markGone } from './lib/gone'
 import { Dropzone } from './components/Dropzone'
+import { ContactForm } from './components/ContactForm'
+import { buildMeta, CAN_CONTACT } from './lib/contact'
 import { Guide } from './components/Guide'
 import { SnapshotPanel } from './components/SnapshotPanel'
 import { UserList, type Timeline } from './components/UserList'
@@ -56,9 +58,10 @@ const VIEWS = [
   'mutual',
   'not-following-back',
   'snapshots',
+  'contact',
 ] as const
 type View = (typeof VIEWS)[number]
-type ListView = Exclude<View, 'home' | 'snapshots'>
+type ListView = Exclude<View, 'home' | 'snapshots' | 'contact'>
 
 type Tone = 'red' | 'green' | 'brand' | 'neutral'
 type Notice = { tone: 'red' | 'green' | 'neutral'; text: string } | null
@@ -421,7 +424,15 @@ export default function App() {
         {notice && <NoticeBar notice={notice} onDismiss={() => setNotice(null)} />}
         {warnings.length > 0 && <WarningBox warnings={warnings} />}
 
-        {progress ? (
+        {view === 'contact' ? (
+          <Detail title="문의하기" onBack={() => go('home')}>
+            <p className="ko px-4 pb-4 text-[15px] leading-[1.65] text-muted sm:px-5">
+              안 되는 것, 숫자가 이상한 것, 있었으면 하는 것 무엇이든 적어주세요. 직접 읽고
+              고칩니다.
+            </p>
+            <ContactForm meta={buildMeta(current, metas.length)} />
+          </Detail>
+        ) : progress ? (
           <div className="pt-6">
             <AnalyzeProgress progress={progress} />
           </div>
@@ -856,7 +867,7 @@ function Workspace(props: WorkspaceProps) {
     )
   }
 
-  if (view !== 'home') {
+  if (view !== 'home' && view !== 'contact') {
     const def = lists[view]
     return (
       <Detail
@@ -1000,6 +1011,25 @@ function Home({
       </section>
 
       <ReuploadCard onFiles={onFiles} busy={busy} hasComparison={!!comparison} />
+
+      {CAN_CONTACT && (
+        <Card className="mt-3 px-2 py-1">
+          <button
+            onClick={() => go('contact')}
+            data-row="contact"
+            className="flex w-full items-center gap-3.5 rounded-2xl px-3 py-3.5 text-left transition-colors hover:bg-sunken"
+          >
+            <IconBadge icon="chat" tone="neutral" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[16px] font-bold">문의하기</span>
+              <span className="ko mt-0.5 block text-[13px] text-muted">
+                숫자가 이상하거나 안 되는 게 있으면 알려주세요
+              </span>
+            </span>
+            <Icon name="chevron" size={18} className="text-line-strong" />
+          </button>
+        </Card>
+      )}
 
       <Card className="mt-3 px-2 py-1">
         <button
@@ -1379,8 +1409,11 @@ function Footer() {
     <footer className="gutter mx-auto w-full max-w-[680px] pb-12">
       <p className="ko text-[13px] leading-[1.7] text-faint">
         언팔로그는 인스타그램 공식 데이터 내보내기 파일만 사용해요. 계정 로그인 정보를 요구하지
-        않아요. 팔로워 목록과 분석 결과는 브라우저 밖으로 나가지 않고, 저장된 스냅샷도 이
+        않아요. 팔로워 목록과 아이디는 브라우저 밖으로 나가지 않고, 저장된 스냅샷도 이
         브라우저에만 있어서 브라우저 데이터를 지우면 함께 사라져요.
+        {CAN_CONTACT
+          ? ' 문의할 때만, 그리고 직접 켜 두셨을 때만 팔로워 수 같은 숫자 요약이 함께 전달돼요.'
+          : ''}
         {COUNTS_VISITS
           ? ' 얼마나 쓰이는지 보려고 방문 횟수만 익명으로 세요. 누구인지 알 수 있는 정보는 보내지 않아요.'
           : ''}
@@ -1388,6 +1421,16 @@ function Footer() {
       <p className="ko mt-2 text-[13px] text-faint">
         Instagram은 Meta Platforms, Inc.의 상표이며 이 프로젝트와 아무 관련이 없어요.
       </p>
+      {CAN_CONTACT && (
+        <a
+          href="#contact"
+          data-contact-link
+          className="ko mt-4 inline-flex items-center gap-1 text-[13px] font-semibold text-muted"
+        >
+          문의하기
+          <Icon name="chevron" size={14} />
+        </a>
+      )}
     </footer>
   )
 }

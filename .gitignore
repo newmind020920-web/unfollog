@@ -6,3 +6,4 @@ dist
 dist-artifact
 server/node_modules
 server/.wrangler
+*.tsbuildinfo

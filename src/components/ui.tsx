@@ -126,6 +126,7 @@ export function Spinner({ className }: { className?: string }) {
 export type IconName =
   | 'upload' | 'lock' | 'search' | 'download' | 'trash' | 'external'
   | 'check' | 'info' | 'clock' | 'chevron' | 'logo' | 'x' | 'pencil' | 'copy'
+  | 'chat'
   | 'user' | 'users' | 'userMinus' | 'userPlus' | 'userCheck' | 'userX' | 'swap' | 'layers' | 'ban'
 
 /** 사람 아이콘의 공통 몸통 — 오른쪽에 기호를 붙여 변형합니다 */
@@ -137,6 +138,10 @@ const PERSON = (
 )
 
 const PATHS: Record<IconName, ReactNode> = {
+  // 말풍선 — 문의
+  chat: (
+    <path d="M20.25 11.25a7.5 7.5 0 0 1-10.9 6.69L4.5 19.5l1.56-4.85a7.5 7.5 0 1 1 14.19-3.4Z" />
+  ),
   // 끊긴 고리 — 이어져 있던 팔로우가 한 곳 끊어진 모양
   logo: <path d="M16.8 6.25A7.5 7.5 0 1 1 7.2 6.25" />,
   upload: (
