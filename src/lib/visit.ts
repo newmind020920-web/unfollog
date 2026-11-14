@@ -11,6 +11,46 @@
 const API = import.meta.env.VITE_API_URL as string | undefined
 const CODE_KEY = 'unfollog.code'
 
+/**
+ * 브라우저 종류만 짧게. 전체 User-Agent 는 지문이 될 수 있어 보내지 않습니다.
+ * 카톡·인스타 인앱 브라우저는 따로 표시합니다 — 같은 폰이라도 코드가 따로
+ * 생기기 때문에, 숫자가 부풀어 보이는 가장 흔한 원인입니다.
+ */
+function browserHint(): string {
+  const ua = navigator.userAgent
+  const os = /iPhone|iPad/.test(ua)
+    ? 'iOS'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Mac/.test(ua)
+        ? 'Mac'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : '기타'
+  const app = /KAKAOTALK/i.test(ua)
+    ? '카톡'
+    : /Instagram/i.test(ua)
+      ? '인스타'
+      : /NAVER|Whale/i.test(ua)
+        ? '네이버'
+        : /Line\//i.test(ua)
+          ? '라인'
+          : /FBAN|FBAV/i.test(ua)
+            ? '페북'
+            : /CriOS|Chrome\//.test(ua)
+              ? 'Chrome'
+              : /FxiOS|Firefox/.test(ua)
+                ? 'Firefox'
+                : /Edg\//.test(ua)
+                  ? 'Edge'
+                  : /Safari/.test(ua)
+                    ? 'Safari'
+                    : '기타'
+  return `${os} ${app}`
+}
+
 /** 이 브라우저의 코드. 없으면 만들어 둡니다. */
 export function visitorCode(): string | null {
   try {
@@ -33,7 +73,10 @@ export function ping(detail: { uploaded?: boolean; snapshots?: number } = {}) {
   const code = visitorCode()
   if (!code) return
 
-  const payload = JSON.stringify({ code, ...detail })
+  // 어느 주소에서, 어떤 브라우저로 들어왔는지도 함께 보냅니다. 코드는 주소마다
+  // 따로 생기기 때문에, 미리보기 배포 주소나 인앱 브라우저로 들어오면 같은
+  // 사람이 여러 명으로 세어집니다. 이게 없으면 그 사실을 알아낼 수 없습니다.
+  const payload = JSON.stringify({ code, host: location.hostname, app: browserHint(), ...detail })
 
   // 보내는 형식을 text/plain 으로 둡니다. application/json 으로 보내면
   // 브라우저가 CORS 사전 요청(preflight)을 요구하는데, sendBeacon 은 그것을

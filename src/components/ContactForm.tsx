@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Card, Icon, Spinner } from './ui'
-import { sendInquiry, type SendResult } from '../lib/contact'
+import { failureText, sendInquiry, type SendResult } from '../lib/contact'
 
 const MAX = 2000
 
@@ -27,7 +27,7 @@ export function ContactForm({ meta }: { meta: string }) {
     setSending(false)
   }
 
-  if (result === 'sent') {
+  if (result?.ok) {
     return (
       <Card className="p-6 text-center" data-sent>
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-green-weak text-green">
@@ -107,12 +107,13 @@ export function ContactForm({ meta }: { meta: string }) {
         </label>
       </div>
 
-      {result && (
-        <p className="ko mt-4 text-[14px] leading-[1.6] text-red">
-          {result === 'too-soon'
-            ? '방금 보내셨어요. 1분 뒤에 다시 눌러주세요.'
-            : '보내지 못했어요. 잠시 뒤 다시 시도해 주세요.'}
-        </p>
+      {result && !result.ok && (
+        <div className="mt-4 rounded-2xl bg-red-weak p-4">
+          <p className="ko text-[14px] leading-[1.6] font-semibold text-red">
+            {failureText(result)}
+          </p>
+          <p className="tnum mt-1.5 text-[12px] text-red/70">오류 {result.detail}</p>
+        </div>
       )}
 
       <div className="mt-5">

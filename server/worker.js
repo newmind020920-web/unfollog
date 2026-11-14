@@ -34,6 +34,11 @@ async function recordVisit(env, body) {
   const code = typeof b.code === 'string' ? b.code : ''
   if (!CODE_RE.test(code)) return new Response('bad code', { status: 400 })
 
+  // 어느 주소/브라우저로 들어왔는지. 같은 사람이 여러 명으로 세어지는 이유를
+  // 가려내는 데 씁니다. 전체 User-Agent 는 받지 않습니다.
+  const host = typeof b.host === 'string' ? b.host.slice(0, 80) : null
+  const app = typeof b.app === 'string' ? b.app.slice(0, 40) : null
+
   const uploaded = b.uploaded === true
   const snapshots = Number.isInteger(b.snapshots) ? Math.min(Number(b.snapshots), 9999) : 0
   const now = Date.now()
@@ -41,16 +46,18 @@ async function recordVisit(env, body) {
 
   // 방문은 하루에 한 번만 셉니다. 새로고침으로 숫자가 부풀지 않게.
   await env.DB.prepare(
-    `INSERT INTO visitor (code, first_at, last_at, visits, uploads, snapshots, last_day)
-     VALUES (?1, ?2, ?2, 1, ?3, ?4, ?5)
+    `INSERT INTO visitor (code, first_at, last_at, visits, uploads, snapshots, last_day, host, app)
+     VALUES (?1, ?2, ?2, 1, ?3, ?4, ?5, ?6, ?7)
      ON CONFLICT(code) DO UPDATE SET
        last_at   = ?2,
        visits    = visits + (CASE WHEN last_day IS ?5 THEN 0 ELSE 1 END),
        uploads   = uploads + ?3,
        snapshots = MAX(snapshots, ?4),
-       last_day  = ?5`,
+       last_day  = ?5,
+       host      = COALESCE(?6, host),
+       app       = COALESCE(?7, app)`,
   )
-    .bind(code, now, uploaded ? 1 : 0, snapshots, day)
+    .bind(code, now, uploaded ? 1 : 0, snapshots, day, host, app)
     .run()
 
   return new Response(null, { status: 204 })
@@ -111,7 +118,7 @@ async function adminPage(env) {
 
   // rowid 는 들어온 순서대로 붙는 번호입니다. 긴 난수 코드 대신 이걸 보여줍니다.
   const rows = await env.DB.prepare(
-    `SELECT rowid AS seq, code, first_at, last_at, visits, uploads, snapshots
+    `SELECT rowid AS seq, code, first_at, last_at, visits, uploads, snapshots, host, app
      FROM visitor ORDER BY last_at DESC LIMIT 200`,
   ).all()
 
@@ -166,6 +173,7 @@ async function adminPage(env) {
  .q button{font:inherit;font-size:12px;border:0;border-radius:8px;padding:6px 10px;cursor:pointer;
            background:#f2f4f6;color:#6b7684}
  .none{background:#fff;border-radius:16px;padding:18px;color:#8b95a1;font-size:14px}
+ .dim{color:#c0c6cd}
 </style></head><body><div class="wrap">
 <h1>언팔로그 · 방문 현황</h1>
 <div class="cards">
@@ -204,85 +212,105 @@ ${
 
 <h2>방문자</h2>
 <table>
-<tr><th>번호</th><th>방문</th><th>업로드</th><th>스냅샷</th><th>처음</th><th>마지막</th></tr>
+<tr><th>번호</th><th>주소</th><th>브라우저</th><th>방문</th><th>업로드</th><th>스냅샷</th><th>처음</th><th>마지막</th></tr>
 ${rows.results
   .map(
     (r) =>
-      `<tr><td><code title="${escapeHtml(String(r.code))}">${no(r.seq)}</code></td><td>${r.visits}</td><td>${r.uploads}</td><td>${r.snapshots}</td><td>${fmt(r.first_at)}</td><td>${fmt(r.last_at)}</td></tr>`,
+      `<tr><td><code title="${escapeHtml(String(r.code))}">${no(r.seq)}</code></td><td>${r.host ? escapeHtml(String(r.host)) : '<span class="dim">모름</span>'}</td><td>${r.app ? escapeHtml(String(r.app)) : '<span class="dim">모름</span>'}</td><td>${r.visits}</td><td>${r.uploads}</td><td>${r.snapshots}</td><td>${fmt(r.first_at)}</td><td>${fmt(r.last_at)}</td></tr>`,
   )
   .join('')}
 </table>
 <p class="hint">
   번호는 들어온 순서예요. 누구인지 알 수 있는 정보는 저장하지 않아요.
   (번호에 마우스를 올리면 실제 코드가 보여요.)<br>
+  <b>같은 사람이 여러 줄로 보일 수 있어요.</b> 코드는 주소·브라우저마다 따로
+  생겨요. 미리보기 배포 주소, 카톡·인스타 인앱 브라우저, 시크릿 창은 각각
+  다른 사람으로 세어져요. <b>주소</b>와 <b>브라우저</b> 칸으로 가려내세요.
+  <span class="dim">모름</span>은 이 칸이 생기기 전에 들어온 기록이에요.<br>
   방문은 하루에 한 번만 세요. <b>두 번 이상 올린 사람</b>이 구독이 성립하는지 보여주는 숫자예요.
 </p>
 </div></body></html>`
   return new Response(body, { headers: { 'content-type': 'text/html;charset=utf-8' } })
 }
 
+/**
+ * 모든 응답에 CORS 헤더를 붙입니다.
+ *
+ * 예전에는 성공 응답에만 붙였습니다. 그러면 404 나 403 이 돌아올 때 브라우저가
+ * 응답을 아예 못 읽어서, 원인이 무엇이든 화면에는 "연결 실패" 로만 보입니다.
+ * 무엇이 잘못됐는지 사람에게 말해 주려면 거절할 때도 붙어 있어야 합니다.
+ */
+function withCors(res, origin) {
+  const headers = new Headers(res.headers)
+  for (const [k, v] of Object.entries(cors(origin))) headers.set(k, v)
+  return new Response(res.body, { status: res.status, headers })
+}
+
 export default {
   /** @param {Request} request @param {Env} env */
   async fetch(request, env) {
-    const url = new URL(request.url)
-    const origin = env.ALLOWED_ORIGIN
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: cors(origin) })
-    }
-
-    if (url.pathname === '/v' && request.method === 'POST') {
-      // 우리 사이트에서 온 요청만 받습니다.
-      const from = request.headers.get('origin')
-      if (from && from !== origin) return new Response('forbidden', { status: 403 })
-      let body
-      try {
-        body = await request.json()
-      } catch {
-        return new Response('bad json', { status: 400 })
-      }
-      const res = await recordVisit(env, body)
-      return new Response(res.body, { status: res.status, headers: cors(origin) })
-    }
-
-    if (url.pathname === '/q' && request.method === 'POST') {
-      const from = request.headers.get('origin')
-      if (from && from !== origin) return new Response('forbidden', { status: 403 })
-      let body
-      try {
-        body = await request.json()
-      } catch {
-        return new Response('bad json', { status: 400 })
-      }
-      const res = await recordInquiry(env, body)
-      return new Response(res.body, { status: res.status, headers: cors(origin) })
-    }
-
-    // 문의를 처리함/안 읽음으로 바꿉니다. 관리자 화면에서만 부릅니다.
-    if (url.pathname === '/admin/done' && request.method === 'POST') {
-      if (url.searchParams.get('key') !== env.ADMIN_KEY) {
-        return new Response('열쇠가 필요해요', { status: 401 })
-      }
-      const form = await request.formData()
-      const id = Number(form.get('id'))
-      const to = form.get('to') === '1' ? 1 : 0
-      if (Number.isInteger(id)) {
-        await env.DB.prepare(`UPDATE inquiry SET done = ?2 WHERE id = ?1`).bind(id, to).run()
-      }
-      return new Response(null, {
-        status: 303,
-        headers: { location: `/admin?key=${encodeURIComponent(env.ADMIN_KEY)}` },
-      })
-    }
-
-    if (url.pathname === '/admin') {
-      // 열쇠는 Workers 비밀값에만 있습니다. 공개 저장소에 들어가지 않습니다.
-      if (url.searchParams.get('key') !== env.ADMIN_KEY) {
-        return new Response('열쇠가 필요해요: /admin?key=...', { status: 401 })
-      }
-      return adminPage(env)
-    }
-
-    return new Response('not found', { status: 404 })
+    return withCors(await route(request, env), env.ALLOWED_ORIGIN)
   },
+}
+
+/** @param {Request} request @param {Env} env */
+async function route(request, env) {
+  const url = new URL(request.url)
+  const origin = env.ALLOWED_ORIGIN
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors(origin) })
+  }
+
+  if (url.pathname === '/v' && request.method === 'POST') {
+    // 우리 사이트에서 온 요청만 받습니다.
+    const from = request.headers.get('origin')
+    if (from && from !== origin) return new Response('forbidden', { status: 403 })
+    let body
+    try {
+      body = await request.json()
+    } catch {
+      return new Response('bad json', { status: 400 })
+    }
+    return await recordVisit(env, body)
+  }
+
+  if (url.pathname === '/q' && request.method === 'POST') {
+    const from = request.headers.get('origin')
+    if (from && from !== origin) return new Response('forbidden', { status: 403 })
+    let body
+    try {
+      body = await request.json()
+    } catch {
+      return new Response('bad json', { status: 400 })
+    }
+    return await recordInquiry(env, body)
+  }
+
+  // 문의를 처리함/안 읽음으로 바꿉니다. 관리자 화면에서만 부릅니다.
+  if (url.pathname === '/admin/done' && request.method === 'POST') {
+    if (url.searchParams.get('key') !== env.ADMIN_KEY) {
+      return new Response('열쇠가 필요해요', { status: 401 })
+    }
+    const form = await request.formData()
+    const id = Number(form.get('id'))
+    const to = form.get('to') === '1' ? 1 : 0
+    if (Number.isInteger(id)) {
+      await env.DB.prepare(`UPDATE inquiry SET done = ?2 WHERE id = ?1`).bind(id, to).run()
+    }
+    return new Response(null, {
+      status: 303,
+      headers: { location: `/admin?key=${encodeURIComponent(env.ADMIN_KEY)}` },
+    })
+  }
+
+  if (url.pathname === '/admin') {
+    // 열쇠는 Workers 비밀값에만 있습니다. 공개 저장소에 들어가지 않습니다.
+    if (url.searchParams.get('key') !== env.ADMIN_KEY) {
+      return new Response('열쇠가 필요해요: /admin?key=...', { status: 401 })
+    }
+    return adminPage(env)
+  }
+
+  return new Response('not found', { status: 404 })
 }

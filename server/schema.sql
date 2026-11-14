@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS visitor (
   visits      INTEGER NOT NULL DEFAULT 0,  -- 방문 횟수 (하루 1회만 셈)
   uploads     INTEGER NOT NULL DEFAULT 0,  -- 파일을 올린 횟수
   snapshots   INTEGER NOT NULL DEFAULT 0,  -- 가지고 있는 스냅샷 수
-  last_day    TEXT                          -- 마지막으로 센 날짜 (YYYY-MM-DD)
+  last_day    TEXT,                         -- 마지막으로 센 날짜 (YYYY-MM-DD)
+  host        TEXT,                         -- 들어온 주소 (미리보기 배포를 가려내기 위함)
+  app         TEXT                          -- 브라우저 종류 (예: iOS 카톡). 전체 UA 는 받지 않음
 );
 
 CREATE INDEX IF NOT EXISTS visitor_last_at ON visitor (last_at);
