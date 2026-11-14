@@ -5,10 +5,17 @@ export function Dropzone({
   onFiles,
   busy,
   compact = false,
+  label = '파일 올리기',
+  size = 'sm',
+  full = false,
 }: {
   onFiles: (files: File[]) => void
   busy: boolean
   compact?: boolean
+  /** compact 일 때 버튼에 쓸 글자 */
+  label?: string
+  size?: 'sm' | 'md'
+  full?: boolean
 }) {
   const [hovering, setHovering] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -24,9 +31,16 @@ export function Dropzone({
   if (compact) {
     return (
       <>
-        <Button variant="primary" size="sm" onClick={() => inputRef.current?.click()} disabled={busy}>
+        <Button
+          variant="primary"
+          size={size}
+          full={full}
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+          data-reupload
+        >
           {busy ? <Spinner className="h-4 w-4" /> : <Icon name="upload" size={16} />}
-          {busy ? '분석 중' : '파일 올리기'}
+          {busy ? '분석 중' : label}
         </Button>
         <FileInput inputRef={inputRef} onFiles={onFiles} />
       </>

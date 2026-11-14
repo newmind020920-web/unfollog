@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
 
 export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ')
@@ -25,6 +25,9 @@ export function Button({
   disabled,
   title,
   full,
+  // data-* 같은 나머지 속성을 그대로 넘깁니다. 넘기지 않으면 테스트에서
+  // 버튼을 지목할 방법이 없습니다.
+  ...rest
 }: {
   children: ReactNode
   onClick?: () => void
@@ -33,7 +36,7 @@ export function Button({
   disabled?: boolean
   title?: string
   full?: boolean
-}) {
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'onClick' | 'title' | 'disabled'>) {
   const base =
     'inline-flex items-center justify-center gap-1.5 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40'
   const sizes = {
@@ -56,6 +59,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       className={cx(base, sizes[size], variants[variant], full && 'w-full')}
+      {...rest}
     >
       {children}
     </button>
@@ -94,12 +98,13 @@ export function InfoBox({
   children,
 }: {
   icon?: IconName
-  tone?: 'neutral' | 'brand'
+  tone?: 'neutral' | 'brand' | 'red'
   children: ReactNode
 }) {
   const tones = {
     neutral: 'bg-sunken text-muted',
     brand: 'bg-brand-weak text-brand',
+    red: 'bg-red-weak text-red',
   }
   return (
     <div className={cx('flex gap-2.5 rounded-2xl p-4 text-[14px] leading-[1.6]', tones[tone])}>

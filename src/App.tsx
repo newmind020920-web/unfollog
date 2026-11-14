@@ -432,6 +432,8 @@ export default function App() {
             view={view}
             go={go}
             back={back}
+            onFiles={handleFiles}
+            busy={busy}
             current={current}
             baseline={baseline}
             analysis={analysis}
@@ -506,7 +508,7 @@ function Header({
           <span className="display truncate text-[18px] font-bold">언팔로그</span>
         </button>
         {hasData ? (
-          <Dropzone onFiles={onFiles} busy={busy} compact />
+          <Dropzone onFiles={onFiles} busy={busy} compact label="재업로드" />
         ) : (
           <Pill tone="green">
             <Icon name="lock" size={13} strokeWidth={2.2} />
@@ -670,6 +672,8 @@ type WorkspaceProps = {
   onDelete: (id: string) => void
   onRename: (id: string, label: string) => void
   onClearAll: () => void
+  onFiles: (files: File[]) => void
+  busy: boolean
 }
 
 function buildLists(
@@ -897,6 +901,8 @@ function Home({
   metas,
   persistent,
   lists,
+  onFiles,
+  busy,
 }: WorkspaceProps & { lists: Record<ListView, ListDef> }) {
   const unfollowed = lists.unfollowers.users?.length ?? null
   const maybeBlocked = lists['blocked'].users?.length ?? 0
@@ -992,6 +998,8 @@ function Home({
           <FirstRecordCard />
         )}
       </section>
+
+      <ReuploadCard onFiles={onFiles} busy={busy} hasComparison={!!comparison} />
 
       <Card className="mt-3 px-2 py-1">
         <button
@@ -1174,6 +1182,48 @@ function FirstRecordCard() {
           </p>
         </div>
       )}
+    </Card>
+  )
+}
+
+/**
+ * 다시 올리는 자리.
+ *
+ * 비교할 스냅샷이 아직 없으면 "한 번 더 올려야 언팔을 알 수 있다" 는 사실이
+ * 중요하고, 이미 있으면 "최신으로 갱신한다" 가 중요합니다. 기간을 잘못 골라
+ * 받은 사람이 새로 받아 올리는 자리이기도 합니다.
+ */
+function ReuploadCard({
+  onFiles,
+  busy,
+  hasComparison,
+}: {
+  onFiles: (files: File[]) => void
+  busy: boolean
+  hasComparison: boolean
+}) {
+  return (
+    <Card className="mt-3 p-5" data-reupload-card>
+      <div className="flex items-center gap-3.5">
+        <IconBadge icon="upload" tone="brand" />
+        <div className="min-w-0 flex-1">
+          <p className="ko text-[16px] leading-[1.35] font-bold">
+            {hasComparison ? '새 파일로 갱신하기' : '파일을 한 번 더 올리기'}
+          </p>
+          <p className="ko mt-0.5 text-[13px] leading-[1.5] text-muted">
+            {hasComparison
+              ? '내보내기를 새로 받았다면 올려주세요'
+              : '내보내기를 새로 받으면 떠난 사람이 나와요'}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4">
+        <Dropzone onFiles={onFiles} busy={busy} compact label="재업로드 하기" size="md" full />
+      </div>
+      <p className="ko mt-3 text-[13px] leading-[1.55] text-faint">
+        숫자가 인스타 앱과 많이 다르면, 내보낼 때{' '}
+        <b className="font-semibold text-muted">기간을 ‘전체’</b>로 고르고 다시 받아주세요.
+      </p>
     </Card>
   )
 }

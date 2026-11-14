@@ -1,4 +1,4 @@
-import { Icon, InfoBox } from './ui'
+import { cx, Icon, InfoBox } from './ui'
 
 const DYI_URL = 'https://accountscenter.instagram.com/info_and_permissions/dyi/'
 
@@ -16,7 +16,7 @@ function Arrow() {
   return <span className="text-[13px] text-faint">→</span>
 }
 
-const STEPS: { title: React.ReactNode; body: React.ReactNode }[] = [
+const STEPS: { title: React.ReactNode; body: React.ReactNode; alert?: React.ReactNode }[] = [
   {
     title: <Tap>내 정보 내보내기</Tap>,
     body: (
@@ -63,10 +63,16 @@ const STEPS: { title: React.ReactNode; body: React.ReactNode }[] = [
         <Tap>뒤로가기</Tap> <Arrow /> <Tap>기간</Tap> <Arrow /> <Tap>전체</Tap>
       </>
     ),
+    alert: (
+      <>
+        <b className="font-semibold">여기서 제일 많이 틀려요.</b> 기간을 ‘전체’로 두지 않으면 그
+        기간에 팔로우한 사람만 파일에 담겨요. 팔로워 800명이 500명으로 나오는 건 거의 다 이
+        경우예요.
+      </>
+    ),
     body: (
       <>
-        기간을 좁히면 목록이 잘려요. 같은 화면에{' '}
-        <b className="font-semibold text-fg-2">형식</b>이 있으면{' '}
+        같은 화면에 <b className="font-semibold text-fg-2">형식</b>이 있으면{' '}
         <b className="font-semibold text-fg-2">JSON</b>으로 두세요. 팔로우한 날짜가 들어 있어서 더
         정확하게 분석할 수 있어요.
       </>
@@ -93,11 +99,23 @@ export function Guide() {
       <ol className="space-y-6">
         {STEPS.map((step, i) => (
           <li key={i} className="flex gap-3.5">
-            <span className="tnum mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand text-[14px] font-bold text-white">
+            <span
+              className={cx(
+                'tnum mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[14px] font-bold text-white',
+                step.alert ? 'bg-red' : 'bg-brand',
+              )}
+            >
               {i + 1}
             </span>
             <div className="min-w-0 pt-0.5">
               <p className="ko text-[17px] leading-[1.5] font-bold">{step.title}</p>
+              {step.alert && (
+                <div className="mt-2">
+                  <InfoBox icon="info" tone="red">
+                    {step.alert}
+                  </InfoBox>
+                </div>
+              )}
               <p className="ko mt-1.5 text-[15px] leading-[1.65] text-muted">{step.body}</p>
             </div>
           </li>
