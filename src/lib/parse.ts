@@ -46,18 +46,27 @@ export function classifyFileName(path: string): FileKind {
   return null
 }
 
+/** 프로필 주소로 인정하는 곳. 스레드는 인스타그램 계정을 그대로 씁니다. */
+const PROFILE_HOST = /(^|\.)(instagram\.com|threads\.net|threads\.com)$/i
+
 function usernameFromHref(href: string): string | null {
   try {
     const url = new URL(href)
-    if (!/(^|\.)instagram\.com$/i.test(url.hostname)) return null
+    if (!PROFILE_HOST.test(url.hostname)) return null
     const seg = url.pathname.split('/').filter(Boolean)
     // 최근 내보내기는 프로필 주소를 /_u/<아이디> 로 적기도 합니다.
-    if (seg.length === 2 && seg[0] === '_u') return decodeURIComponent(seg[1])
+    if (seg.length === 2 && seg[0] === '_u') return stripAt(seg[1])
     if (seg.length !== 1) return null // /p/..., /explore/..., /stories/... 는 프로필이 아님
-    return decodeURIComponent(seg[0])
+    return stripAt(seg[0])
   } catch {
     return null
   }
+}
+
+/** 스레드 주소는 /@아이디 꼴입니다. 앞의 @ 를 떼야 인스타 쪽과 같은 아이디가 됩니다. */
+function stripAt(seg: string): string | null {
+  const name = decodeURIComponent(seg).replace(/^@/, '')
+  return name || null
 }
 
 /** 프로필이 아닌 인스타그램 경로 */

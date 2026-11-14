@@ -418,6 +418,34 @@ async function main() {
     )
   }
 
+  console.log('\n스레드 내보내기')
+  {
+    // 스레드는 인스타와 따로 내보내지만 파일 이름과 구조가 같습니다.
+    // 다른 점은 주소가 threads.net 이고 경로가 /@아이디 라는 것뿐입니다.
+    const followers = JSON.stringify({
+      text_post_app_text_post_app_followers: [
+        { string_list_data: [{ href: 'https://www.threads.net/@alice', value: 'alice', timestamp: 1700000000 }] },
+      ],
+    })
+    // 팔로잉은 value 에도 주소 전체가 들어오는 경우가 있습니다.
+    const following = JSON.stringify({
+      text_post_app_text_post_app_following: [
+        { string_list_data: [{ href: 'https://www.threads.net/@alice', value: 'https://www.threads.net/@alice', timestamp: 1700000000 }] },
+        { string_list_data: [{ href: 'https://www.threads.com/@carol', value: 'https://www.threads.com/@carol', timestamp: 1700000200 }] },
+      ],
+    })
+    const r = await parseFiles([
+      new File([followers], 'followers.json'),
+      new File([following], 'following.json'),
+    ])
+    eq('스레드 팔로워를 읽음', r.followers.map((u) => u.username), ['alice'])
+    eq('스레드 팔로잉을 읽음 (@ 를 뗀 아이디)', r.following.map((u) => u.username).sort(), ['alice', 'carol'])
+
+    const a = analyze({ id: 't', createdAt: 1, label: '스레드', ...r })
+    eq('맞팔이 잡힘', a.mutual.map((u) => u.username), ['alice'])
+    eq('짝사랑이 잡힘', a.notFollowingBack.map((u) => u.username), ['carol'])
+  }
+
   console.log(`\n${checks - failures}/${checks} 통과`)
   if (failures) process.exit(1)
 }
