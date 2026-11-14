@@ -6,40 +6,32 @@ import { CARDS } from './cards.mjs'
 const OUT = 'out'
 rmSync(OUT, { recursive: true, force: true }); mkdirSync(OUT)
 
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c])
-const nl = (s) => esc(s).replace(/\n/g, '<br>')
+const total = CARDS.length
 
-const page = (c, i) => {
-  const n = `<div class="pg">${String(i + 1).padStart(2, '0')} <span>/ ${String(CARDS.length).padStart(2, '0')}</span></div>`
-  if (c.kind === 'cover')
-    return `<section class="card cover">
-      <div class="eyebrow">${esc(c.eyebrow)}</div>
-      <div class="mid"><h1>${nl(c.title)}</h1><div class="rule"></div><p class="sub">${nl(c.sub)}</p></div>
-      <div class="foot"><span class="swipe">넘겨보세요 →</span>${n}</div>
-    </section>`
-  if (c.kind === 'chapter')
-    return `<section class="card">
-      <div class="head"><span class="no">${esc(c.no)}</span><span class="hair"></span></div>
-      <div class="mid"><h2>${nl(c.title)}</h2><p class="body">${nl(c.body)}</p></div>
-      <div class="foot">${n}</div>
-    </section>`
-  if (c.kind === 'list')
-    return `<section class="card">
-      <div class="head"><span class="no">${esc(c.no)}</span><span class="hair"></span></div>
-      <div class="mid"><h2 class="sm">${nl(c.title)}</h2>
-        <ul class="items">${c.items
-          .map((it) => `<li><b>${esc(it[0])}</b><span>${esc(it[1])}</span></li>`)
-          .join('')}</ul></div>
-      <div class="foot">${n}</div>
-    </section>`
-  if (c.kind === 'shot')
-    return `<section class="card shot">
-      <div class="shotwrap"><img src="${c.src}"></div>
-      <div class="mid"><p class="cap">${nl(c.caption)}</p></div>
-      <div class="foot">${n}</div>
-    </section>`
-  return `<section class="card end">
-    <div class="mid">
+function topPanel(t) {
+  if (!t) return ''
+  if (t.kind === 'shot') return `<div class="panel shot"><img src="${t.src}"></div>`
+  if (t.kind === 'pills')
+    return `<div class="panel"><div class="pills">${t.rows
+      .map(
+        (r, i) => `<div class="pill"><span class="dot">${i + 1}</span>
+        <span class="tx"><b>${r[0]}</b><em>${r[1]}</em></span></div>`,
+      )
+      .join('')}</div></div>`
+  if (t.kind === 'path')
+    return `<div class="panel"><div class="path">${t.steps
+      .map((s) => `<span class="step">${s}</span>`)
+      .join('<span class="arr">›</span>')}</div>
+      <div class="notes">${t.note.map((n) => `<div class="note">${n}</div>`).join('')}</div></div>`
+  // warn
+  return `<div class="panel"><div class="form">${t.rows
+    .map((r) => `<div class="field"><span>${r[0]}</span><i>${r[1]}</i></div>`)
+    .join('')}<div class="stamp">${t.stamp}</div></div></div>`
+}
+
+const card = (c, i) => {
+  if (c.kind === 'end')
+    return `<section class="card end">
       <svg class="mark" viewBox="0 0 120 120">
         <defs><linearGradient id="g" x1="0" y1="120" x2="120" y2="0" gradientUnits="userSpaceOnUse">
           <stop offset="0" stop-color="#f7963c"/><stop offset=".52" stop-color="#d42e86"/>
@@ -50,20 +42,27 @@ const page = (c, i) => {
                 stroke-width="3.3" stroke-linecap="round"/></g>
       </svg>
       <div class="brand">언팔로그</div>
-      <div class="rule short"></div>
-      <div class="url">${esc(c.url)}</div>
-      <div class="note">${esc(c.foot)}</div>
+      <div class="url">${c.url}</div>
+      <div class="note2">${c.foot}</div>
+      <div class="cta">지금 확인해 보세요</div>
+      <div class="wm">unfollog</div>
+    </section>`
+
+  return `<section class="card">
+    <div class="top">${topPanel(c.top)}<div class="fade"></div></div>
+    <div class="bottom">
+      ${c.no ? `<div class="no">${c.no}</div>` : ''}
+      <h2>${c.title.replace(/\n/g, '<br>')}</h2>
+      <p>${c.body.replace(/\n/g, '<br>')}</p>
     </div>
-    <div class="foot">${n}</div>
+    <div class="wm">unfollog</div>
   </section>`
 }
 
 const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<link rel="stylesheet" href="myeongjo.css">
-<link rel="stylesheet" href="display.css">
 <link rel="stylesheet" href="../../node_modules/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <link rel="stylesheet" href="style.css">
-</head><body>${CARDS.map(page).join('')}</body></html>`
+</head><body>${CARDS.map(card).join('')}</body></html>`
 writeFileSync('index.html', html)
 
 const b = await pw.chromium.launch({ args: ['--no-sandbox'] })
@@ -76,4 +75,4 @@ for (let i = 0; i < cards.length; i++) {
   await cards[i].screenshot({ path: `${OUT}/${String(i + 1).padStart(2, '0')}.png` })
 }
 await b.close()
-console.log(`카드 ${cards.length}장`)
+console.log(`카드 ${cards.length}장 / ${total}`)
