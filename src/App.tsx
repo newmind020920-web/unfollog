@@ -24,6 +24,7 @@ import { AnalyzeProgress, type Progress, type Step } from './components/Progress
 import { buildReminderIcs, daysFromNow } from './lib/reminder'
 import { download } from './lib/export'
 import { ping } from './lib/visit'
+import { loadGone, markGone } from './lib/gone'
 import { Dropzone } from './components/Dropzone'
 import { Guide } from './components/Guide'
 import { SnapshotPanel } from './components/SnapshotPanel'
@@ -71,6 +72,8 @@ type ListDef = {
   tone: Tone
   /** null = 비교할 스냅샷이 아직 없음 */
   users: IgUser[] | null
+  /** 세어서 보여줄 수. 없으면 users 의 길이를 씁니다 */
+  count?: number
   /** 떠난 시점 — 구간이 둘 이상일 때만 채웁니다 */
   timeline?: Timeline
   /** 행 아래 설명 (떠난 시점 대신) */
@@ -196,6 +199,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
+  // 프로필을 열어 "사라졌다"고 확인한 계정. 언팔 목록에서 빼 줍니다.
+  const [gone, setGone] = useState<Set<string>>(() => loadGone())
   const [notice, setNotice] = useState<Notice>(null)
   const [warnings, setWarnings] = useState<string[]>([])
   const [persistent, setPersistent] = useState(true)
@@ -417,6 +422,8 @@ export default function App() {
             analysis={analysis}
             comparison={comparison}
             trace={trace}
+            gone={gone}
+            onToggleGone={(name, isGone) => setGone(markGone(name, isGone))}
             metas={metas}
             persistent={persistent}
             onPickCurrent={async (id) => {
@@ -639,6 +646,8 @@ type WorkspaceProps = {
   analysis: Analysis
   comparison: Comparison | null
   trace: DepartureTrace | null
+  gone: Set<string>
+  onToggleGone: (username: string, gone: boolean) => void
   metas: SnapshotMeta[]
   persistent: boolean
   onPickCurrent: (id: string) => void
@@ -654,6 +663,7 @@ function buildLists(
   analysis: Analysis,
   comparison: Comparison | null,
   trace: DepartureTrace | null,
+  gone: Set<string>,
   now: number,
 ): Record<ListView, ListDef> {
   const since = baseline ? `‘${baseline.label}’` : '지난번'
@@ -662,6 +672,10 @@ function buildLists(
 
   // 사라진 사람을 이유별로 나눕니다.
   const left = ready ? trace.departures.filter((d) => d.reason !== 'blockedOrGone') : null
+  // 사용자가 직접 확인해 '사라진 계정'으로 표시한 사람은 떠난 사람이 아닙니다.
+  // 목록에서 지우지는 않습니다 — 지우면 잘못 눌렀을 때 되돌릴 방법이 없습니다.
+  const goneIn = (list: Departure[] | null) =>
+    list ? list.filter((d) => gone.has(d.user.username)).length : 0
   const maybeBlocked = ready ? trace.departures.filter((d) => d.reason === 'blockedOrGone') : null
   const renames = ready ? trace.renames : null
   const unsure = new Map(
@@ -681,18 +695,22 @@ function buildLists(
     unfollowers: {
       view: 'unfollowers',
       label: '나를 언팔한 사람',
-      description: `${since} 스냅샷에서는 나를 팔로우했지만 지금은 팔로우하지 않는 계정이에요.${timingNote}${myBlocksNote}`,
+      description:
+        `${since} 스냅샷에서는 나를 팔로우했지만 지금은 팔로우하지 않는 계정이에요.${timingNote}${myBlocksNote}` +
+        (goneIn(left) > 0 ? ` 사라진 계정으로 표시한 ${num(goneIn(left))}명은 빼고 셌어요.` : ''),
       icon: 'userMinus',
       tone: 'red',
       users: left ? left.map((d) => d.user) : null,
+      count: left ? left.length - goneIn(left) : undefined,
       timeline,
       tags: unsure.size ? unsure : undefined,
       footnote:
-        '상대가 언팔한 경우가 대부분이지만, 계정이 삭제·비활성화·정지된 경우도 똑같이 보여요. ' +
-        '내보내기 파일에는 계정이 살아 있는지가 적혀 있지 않아서 둘을 가려낼 수 없어요. ' +
+        '대부분은 상대가 언팔한 거예요. 다만 계정이 삭제·비활성화·정지돼도 똑같이 보이는데, ' +
+        '파일에는 계정이 살아 있는지가 적혀 있지 않아 가려낼 수 없어요. ' +
+        '아이디를 눌러 프로필이 안 열리면 아래 버튼으로 표시해 두세요. 다음부터 이 목록에서 빠져요.' +
         (unsure.size
-          ? '‘구분 불가’ 표시는 내가 팔로우하지 않던 계정이라, 차단일 가능성까지 섞여 있는 경우예요.'
-          : '아이디를 눌러 프로필이 열리는지 보면 확인할 수 있어요.'),
+          ? ' ‘구분 불가’ 표시는 내가 팔로우하지 않던 계정이라, 차단일 가능성까지 섞인 경우예요.'
+          : ''),
       csv: 'unfollog-나를-언팔한-사람',
       emptyTitle: '나를 언팔한 사람이 없어요',
       emptyBody: '저장된 스냅샷 사이에 떠난 팔로워가 한 명도 없어요.',
@@ -704,6 +722,7 @@ function buildLists(
       icon: 'ban',
       tone: 'red',
       users: maybeBlocked ? maybeBlocked.map((d) => d.user) : null,
+      count: maybeBlocked ? maybeBlocked.length - goneIn(maybeBlocked) : undefined,
       timeline,
       footnote:
         trace && !trace.hasUnfollowLog
@@ -791,8 +810,8 @@ function buildLists(
 function Workspace(props: WorkspaceProps) {
   const { view, back, current, baseline, analysis, comparison, metas } = props
   const lists = useMemo(
-    () => buildLists(current, baseline, analysis, comparison, props.trace, Date.now()),
-    [current, baseline, analysis, comparison, props.trace],
+    () => buildLists(current, baseline, analysis, comparison, props.trace, props.gone, Date.now()),
+    [current, baseline, analysis, comparison, props.trace, props.gone],
   )
 
   if (view === 'snapshots') {
@@ -823,7 +842,7 @@ function Workspace(props: WorkspaceProps) {
     return (
       <Detail
         title={def.label}
-        count={def.users?.length}
+        count={def.users ? (def.count ?? def.users.length) : undefined}
         description={def.users ? def.description : undefined}
         footnote={def.users?.length ? def.footnote : undefined}
         onBack={back}
@@ -835,6 +854,11 @@ function Workspace(props: WorkspaceProps) {
             timeline={def.timeline}
             notes={def.notes}
             tags={def.tags}
+            gone={
+              view === 'unfollowers' || view === 'blocked'
+                ? { set: props.gone, onToggle: props.onToggleGone }
+                : undefined
+            }
             csvName={def.csv}
             empty={<Empty icon="check" tone="green" title={def.emptyTitle} body={def.emptyBody} />}
           />
@@ -925,10 +949,7 @@ function Home({
         <h2 className="mb-2 px-1 text-[14px] font-semibold text-muted">지금 내 팔로우 관계</h2>
         <OneWayCard def={lists['not-following-back']} onOpen={go} />
         <StatRow defs={[lists.followers, lists.following, lists.mutual]} onOpen={go} />
-        <p className="ko mt-2 px-1 text-[12px] leading-[1.6] text-faint">
-          인스타그램 화면에 뜨는 숫자보다 많을 수 있어요. 내보내기 파일에는 삭제·정지된 계정도
-          그대로 남아 있는데, 인스타그램은 그런 계정을 빼고 세거든요.
-        </p>
+        <WhyDifferent />
       </section>
 
       <section className="mt-6">
@@ -974,6 +995,46 @@ function Home({
           <Icon name="chevron" size={18} className="text-line-strong" />
         </button>
       </Card>
+    </div>
+  )
+}
+
+/**
+ * 내보내기 숫자가 인스타그램 화면과 다른 이유.
+ * 평소에는 한 줄만 두고, 눌렀을 때 설명을 펼칩니다. 늘 펼쳐 두기엔
+ * 길고, 작은 글씨로 깔아 두면 아무도 읽지 않습니다.
+ */
+function WhyDifferent() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-2.5">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        data-why-different
+        aria-expanded={open}
+        className="ko flex w-full items-center gap-1.5 px-1 text-left text-[13px] font-medium text-muted"
+      >
+        <Icon name="info" size={15} className="shrink-0" />
+        <span className="flex-1">인스타 앱의 숫자와 다른가요?</span>
+        <Icon
+          name="chevron"
+          size={15}
+          className={cx('shrink-0 transition-transform', open ? 'rotate-90' : '')}
+        />
+      </button>
+      {open && (
+        <div className="ko mt-2 rounded-2xl bg-card p-4 text-[14px] leading-[1.7] text-muted shadow-card">
+          <p>
+            <b className="font-semibold text-fg-2">내보내기 파일이 더 많게 나와요.</b> 상대가 계정을
+            지우거나 정지당해도 파일에는 그대로 남거든요. 인스타 앱은 그런 계정을 빼고 세고요.
+          </p>
+          <p className="mt-2.5">
+            파일에는 계정이 살아 있는지가 적혀 있지 않아서, 저희도 어느 계정인지 가려낼 수 없어요.
+            그래서 <b className="font-semibold text-fg-2">언팔 목록에도 사라진 계정이 섞일 수
+            있어요.</b>
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -1107,7 +1168,7 @@ function MenuRow({
   hint?: string
   last?: boolean
 }) {
-  const count = def.users?.length ?? null
+  const count = def.users ? (def.count ?? def.users.length) : null
   const countTone =
     count === null || count === 0
       ? 'text-faint'

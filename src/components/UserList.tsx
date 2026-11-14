@@ -50,6 +50,7 @@ export function UserList({
   timeline,
   notes,
   tags,
+  gone,
 }: {
   users: IgUser[]
   csvName: string
@@ -59,6 +60,11 @@ export function UserList({
   notes?: Map<string, string>
   /** 사용자명 → 이름 옆 꼬리표 */
   tags?: Map<string, string>
+  /**
+   * 사라진 계정 표시 기능을 켭니다. 프로필을 열어 확인한 결과를
+   * 사용자가 직접 남기고, 표시한 계정은 목록에서 흐리게 보입니다.
+   */
+  gone?: { set: Set<string>; onToggle: (username: string, gone: boolean) => void }
 }) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>(timeline ? 'leftRecent' : 'recent')
@@ -101,6 +107,7 @@ export function UserList({
 
   const visible = filtered.slice(0, limit)
   const hasAnyDate = timeline !== undefined || users.some((u) => u.followedAt !== undefined)
+  const goneShown = gone ? filtered.filter((u) => gone.set.has(u.username)).length : 0
 
   async function handleCopy() {
     const ok = await copyText(filtered.map((u) => u.display).join('\n'))
@@ -190,6 +197,7 @@ export function UserList({
                   user={user}
                   note={notes?.get(user.username) ?? timeline?.get(user.username)?.label}
                   tag={tags?.get(user.username)}
+                  gone={gone}
                 />
               </li>
             ))}
@@ -201,9 +209,11 @@ export function UserList({
               filtered.length > limit && 'border-t border-line',
             )}
           >
-            <span className="tnum text-[13px] text-faint">
+            <span className="ko tnum text-[13px] text-faint">
               {Math.min(limit, filtered.length).toLocaleString('ko-KR')} /{' '}
               {filtered.length.toLocaleString('ko-KR')}명
+              {/* 표시해 둔 계정은 목록에는 남지만 위의 수에는 안 들어갑니다 */}
+              {goneShown > 0 && ` · 사라진 계정 ${goneShown.toLocaleString('ko-KR')}명 포함`}
             </span>
             {filtered.length > limit && (
               <Button size="sm" variant="ghost" onClick={() => setLimit((n) => n + PAGE * 4)}>
@@ -218,17 +228,41 @@ export function UserList({
   )
 }
 
-function Row({ user, note, tag }: { user: IgUser; note?: string; tag?: string }) {
+function Row({
+  user,
+  note,
+  tag,
+  gone,
+}: {
+  user: IgUser
+  note?: string
+  tag?: string
+  gone?: { set: Set<string>; onToggle: (username: string, gone: boolean) => void }
+}) {
+  const isGone = gone?.set.has(user.username) ?? false
   const body = (
     <>
       <Avatar />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <span className="truncate text-[16px] leading-[1.4] font-semibold">@{user.display}</span>
-          {tag && (
+          <span
+            className={cx(
+              'truncate text-[16px] leading-[1.4] font-semibold',
+              isGone && 'text-faint line-through',
+            )}
+          >
+            @{user.display}
+          </span>
+          {isGone ? (
             <span className="shrink-0 rounded-md bg-sunken px-1.5 py-0.5 text-[11px] font-semibold text-muted">
-              {tag}
+              사라진 계정
             </span>
+          ) : (
+            tag && (
+              <span className="shrink-0 rounded-md bg-sunken px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+                {tag}
+              </span>
+            )
           )}
         </span>
         {note ? (
@@ -244,21 +278,42 @@ function Row({ user, note, tag }: { user: IgUser; note?: string; tag?: string })
     </>
   )
 
-  // 샘플 데이터는 실제 계정이 아니므로 링크를 걸지 않습니다.
   if (!user.href) {
     return <div className="flex items-center gap-3.5 px-4 py-3 sm:px-5">{body}</div>
   }
 
-  return (
+  const link = (
     <a
       href={user.href}
       target="_blank"
       rel="noreferrer noopener"
-      className="flex items-center gap-3.5 px-4 py-3 transition-colors hover:bg-sunken sm:px-5"
+      className="flex min-w-0 flex-1 items-center gap-3.5 transition-opacity hover:opacity-70"
     >
       {body}
       {/* 터치 기기에는 hover 가 없으므로 항상 보이게 둡니다. */}
-      <Icon name="external" size={17} className="text-line-strong" />
+      <Icon name="external" size={17} className="shrink-0 text-line-strong" />
     </a>
+  )
+
+  if (!gone) {
+    return <div className="flex items-center gap-3.5 px-4 py-3 sm:px-5">{link}</div>
+  }
+
+  return (
+    <div className="px-4 py-3 sm:px-5">
+      <div className="flex items-center gap-3.5">{link}</div>
+      <div className="mt-2 flex justify-end">
+        <button
+          onClick={() => gone.onToggle(user.username, !isGone)}
+          data-gone-toggle={user.username}
+          className={cx(
+            'rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors',
+            isGone ? 'bg-brand-weak text-brand' : 'bg-sunken text-muted hover:text-fg',
+          )}
+        >
+          {isGone ? '사라진 계정으로 표시함 · 취소' : '프로필이 안 열려요'}
+        </button>
+      </div>
+    </div>
   )
 }
