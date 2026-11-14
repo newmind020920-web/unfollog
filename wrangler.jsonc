@@ -1,0 +1,13 @@
+{
+  // 사이트를 Cloudflare 에 올리기 위한 설정입니다.
+  // 코드가 도는 서버가 아니라, 빌드 결과(dist)를 그대로 내보내는 역할만 합니다.
+  // 집계 서버는 별도이고 server/wrangler.toml 을 씁니다.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "unfollog",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist",
+    // 주소에 해시(#)만 쓰지만, 모르는 경로로 들어와도 첫 화면을 보여줍니다.
+    "not_found_handling": "single-page-application"
+  }
+}
