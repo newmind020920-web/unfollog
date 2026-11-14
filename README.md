@@ -97,8 +97,8 @@ npm run build      # dist/ 에 정적 파일 생성
 npm run build:artifact -- <폴더>   # 스크립트·스타일을 HTML 하나에 넣은 버전
 ```
 
-빌드 결과는 순수 정적 파일이라 GitHub Pages, Vercel, Netlify, S3 어디든 그대로
-올릴 수 있습니다. 백엔드가 필요 없습니다.
+빌드 결과는 순수 정적 파일이라 Cloudflare Pages 에 올라가 있습니다(https://unfollog.pages.dev).
+정적 파일이라 다른 어디에 올려도 됩니다.
 
 ## 구조
 
