@@ -61,6 +61,7 @@ const card = (c, i) => {
 
 const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <link rel="stylesheet" href="../../node_modules/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="noto.css">
 <link rel="stylesheet" href="style.css">
 </head><body>${CARDS.map(card).join('')}</body></html>`
 writeFileSync('index.html', html)

@@ -89,10 +89,13 @@ body { background: #555; font-family: Pretendard, -apple-system, system-ui, sans
   display: grid; place-items: center; font-size: 32px; font-weight: 800;
   color: #BFD0FF; margin-bottom: 28px;
 }
-/* 제목은 900. 800 으로는 레퍼런스만큼 꽉 차 보이지 않습니다.
-   본문도 500 에서 600 으로 올렸습니다. 검은 바탕에서는 500 이 얇아 보여요. */
+/* 제목은 Noto Sans KR 900, 본문은 Pretendard 600.
+   본문을 500 에서 올린 건 검은 바탕에서 같은 굵기가 얇아 보이기 때문입니다.
+   fonts/noto-900.woff2 는 이 카드에 쓰인 글자만 담은 조각입니다. 글을 고쳐
+   없던 글자가 생기면 네모로 나오니, README 를 보고 다시 받으세요. */
 .bottom h2 {
-  font-size: 86px; font-weight: 900; line-height: 1.2; letter-spacing: -0.048em;
+  font-family: 'Noto Sans KR', Pretendard, sans-serif;
+  font-size: 84px; font-weight: 900; line-height: 1.24; letter-spacing: -0.04em;
 }
 .bottom p {
   margin-top: 34px; font-size: 32px; line-height: 1.72; color: #D5DAE2;
@@ -109,7 +112,10 @@ body { background: #555; font-family: Pretendard, -apple-system, system-ui, sans
 /* 마지막 장 */
 .card.end { align-items: center; justify-content: center; text-align: center; }
 .mark { width: 190px; height: 190px; }
-.brand { margin-top: 44px; font-size: 68px; font-weight: 900; letter-spacing: -0.048em; }
+.brand {
+  font-family: 'Noto Sans KR', Pretendard, sans-serif;
+  margin-top: 44px; font-size: 66px; font-weight: 900; letter-spacing: -0.04em;
+}
 .url { margin-top: 26px; font-size: 44px; font-weight: 800; color: var(--accent); }
 .note2 { margin-top: 20px; font-size: 28px; color: var(--dim); font-weight: 600; }
 .cta {
