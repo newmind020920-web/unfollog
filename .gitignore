@@ -7,3 +7,9 @@ dist-artifact
 server/node_modules
 server/.wrangler
 *.tsbuildinfo
+promo/raw
+promo/frames
+promo/last-month*
+promo/today*
+promo/*.mp4
+promo/*.png
