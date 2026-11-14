@@ -60,6 +60,7 @@ const page = (c, i) => {
 
 const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <link rel="stylesheet" href="myeongjo.css">
+<link rel="stylesheet" href="display.css">
 <link rel="stylesheet" href="../../node_modules/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <link rel="stylesheet" href="style.css">
 </head><body>${CARDS.map(page).join('')}</body></html>`
