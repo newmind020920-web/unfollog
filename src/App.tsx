@@ -689,7 +689,7 @@ function buildLists(
   const myBlocksNote =
     trace && trace.blockedByMeCount > 0 ? ` 내가 차단한 ${num(trace.blockedByMeCount)}명은 뺐어요.` : ''
   const howToCheck =
-    '확인하는 방법: 아이디를 눌러 프로필을 열어 보세요. 로그인한 상태에서는 안 보이는데 로그아웃한 브라우저에서는 보이면 차단입니다. 둘 다 안 보이면 계정이 비활성화되거나 삭제된 거예요.'
+    '확인하는 방법: 아이디를 눌러 프로필을 열어 보세요. 로그인한 상태에서는 안 보이는데 로그아웃한 브라우저에서는 보이면 차단입니다. 둘 다 안 보이면 상대가 계정을 비활성화했거나 지운 거예요.'
 
   return {
     unfollowers: {
@@ -705,7 +705,7 @@ function buildLists(
       timeline,
       tags: unsure.size ? unsure : undefined,
       footnote:
-        '대부분은 상대가 언팔한 거예요. 다만 계정이 삭제·비활성화·정지돼도 똑같이 보이는데, ' +
+        '대부분은 상대가 언팔한 거예요. 다만 상대가 계정을 비활성화하거나 지워도 똑같이 보이는데, ' +
         '파일에는 계정이 살아 있는지가 적혀 있지 않아 가려낼 수 없어요. ' +
         '아이디를 눌러 프로필이 안 열리면 아래 버튼으로 표시해 두세요. 다음부터 이 목록에서 빠져요.' +
         (unsure.size
@@ -718,7 +718,7 @@ function buildLists(
     'blocked': {
       view: 'blocked',
       label: '차단 의심 계정',
-      description: `차단당하면 서로의 팔로우가 함께 끊어집니다. 아래 계정은 서로 팔로우하던 사이인데, 내가 끊지 않았는데도 내 팔로워와 팔로잉에서 동시에 사라졌어요. 계정 비활성화·삭제도 같은 모습이라 확인이 필요합니다.${timingNote}`,
+      description: `차단당하면 서로의 팔로우가 함께 끊어집니다. 아래 계정은 서로 팔로우하던 사이인데, 내가 끊지 않았는데도 내 팔로워와 팔로잉에서 동시에 사라졌어요. 상대가 계정을 비활성화하거나 지워도 같은 모습이라, 확인이 필요합니다.${timingNote}`,
       icon: 'ban',
       tone: 'red',
       users: maybeBlocked ? maybeBlocked.map((d) => d.user) : null,
@@ -1026,7 +1026,7 @@ function WhyDifferent() {
         <div className="ko mt-2 rounded-2xl bg-card p-4 text-[14px] leading-[1.7] text-muted shadow-card">
           <p>
             <b className="font-semibold text-fg-2">내보내기 파일이 더 많게 나와요.</b> 상대가 계정을
-            지우거나 정지당해도 파일에는 그대로 남거든요. 인스타 앱은 그런 계정을 빼고 세고요.
+            비활성화하거나 지워도 파일에는 그대로 남거든요. 인스타 앱은 그런 계정을 빼고 세고요.
           </p>
           <p className="mt-2.5">
             파일에는 계정이 살아 있는지가 적혀 있지 않아서, 저희도 어느 계정인지 가려낼 수 없어요.
